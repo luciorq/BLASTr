@@ -1,0 +1,18 @@
+citHeader("To cite BLASTr in publications use:")
+
+bibentry(
+  bibtype  = "Manual",
+  title    = "{BLASTr}: Parallel Taxonomic Classification of Metabarcoding Sequences",
+  author   = c(
+    person("Heron", "Hilario"),
+    person("Lucio", "Queiroz")
+  ),
+  year     = "2026",
+  note     = "R package version 0.2.0",
+  url      = "https://github.com/heronoh/BLASTr"
+)
+
+citFooter(
+  "A publication describing BLASTr is in preparation;",
+  "this entry will be updated with the article reference once available."
+)

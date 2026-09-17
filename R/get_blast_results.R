@@ -1,10 +1,15 @@
-#' @title Run BLASTn
+#' @title Get Formatted BLAST Results
 #'
-#' @description Retrieve BLAST results from a given query sequence
+#' @description Retrieve BLAST results as a tibble for one or more query
+#'   sequences, running serially in the current process. For parallel
+#'   execution over many sequences, use [parallel_blast()] — both
+#'   functions share the same engine and return the same format.
 #'
 #' @inheritParams run_blast
 #'
-#' @returns A `tibble` with the results of BLASTn for each sequence.
+#' @returns A `tibble` with one row per unique query sequence and the
+#'   BLAST tabular output spread into `1_`–`<num_alignments>_` prefixed
+#'   column groups.
 #'
 #' @examples
 #' \dontrun{
@@ -28,114 +33,42 @@ get_blast_results <- function(
   perc_id = 80L,
   perc_qcov_hsp = 80L,
   num_alignments = 4L,
-  # task = task,
-  # gapopen = 5,
-  # gapextend = 2,
   verbose = c("silent", "cmd", "output", "full"),
   env_name = "blastr-blast-env"
 ) {
-  .data <- rlang::.data
+  rlang::check_required(query_seqs)
+  rlang::check_required(db_path)
   verbose <- rlang::arg_match(verbose)
 
-  blast_res <- run_blast(
+  blast_res <- parallel_blast(
     query_seqs = query_seqs,
-    blast_type = blast_type,
-    num_threads = num_threads,
     db_path = db_path,
+    total_cores = 1L,
+    num_threads = num_threads,
+    blast_type = blast_type,
     perc_id = perc_id,
     perc_qcov_hsp = perc_qcov_hsp,
     num_alignments = num_alignments,
+    retry_times = 0L,
     verbose = verbose,
     env_name = env_name
   )
 
-  if (isTRUE(blast_res$status != 0)) {
+  # Fail loudly when nothing ran successfully (e.g. mistyped db_path):
+  # an all-failed result must not be mistaken for "no hits".
+  exit_codes_df <- exit_codes(blast_res)
+  if (isTRUE(all(!(exit_codes_df$exit_code %in% 0L)))) {
+    first_stderr <- exit_codes_df$stderr[
+      !rlang::are_na(exit_codes_df$stderr)
+    ][1]
     cli::cli_abort(
-      message = "{.pkg BLASTr} has not run correctly.",
+      message = c(
+        `x` = "All {nrow(exit_codes_df)} BLAST quer{?y/ies} failed.",
+        `!` = "First error: {first_stderr}"
+      ),
       class = "blastr_run_blast_error"
     )
   }
-  if (blast_res$stdout == "") {
-    df_to_return <- tibble::tibble(`Sequence` = query_seqs)
-    return(df_to_return)
-  }
 
-  blast_table <- blast_res$stdout |>
-    readr::read_delim(
-      delim = "\t",
-      col_names = c(
-        "query",
-        "subject",
-        "indentity",
-        "length",
-        "mismatches",
-        "gaps",
-        "query start",
-        "query end",
-        "subject start",
-        "subject end",
-        "e-value",
-        "bitscore",
-        "qcovhsp",
-        "staxid"
-        # ,
-        # "ssciname"
-      ),
-      show_col_types = FALSE,
-      trim_ws = TRUE,
-      comment = "#"
-    ) |>
-    dplyr::mutate("staxid" = as.character(.data$staxid))
-  # | >
-  #   dplyr::mutate("ssciname" = as.character(.data$ssciname))
-
-
-  blast_table$`subject header` <- purrr::map_chr(
-    .x = blast_table$subject,
-    .f = get_fasta_header,
-    db_path = db_path,
-    verbose = verbose
-  )
-
-  blast_table <- dplyr::relocate(
-    blast_table,
-    "subject header"
-  ) |>
-    dplyr::mutate(
-      `subject header` = stringr::str_trim(
-        .data[["subject header"]],
-        side = "both"
-      )
-    )
-
-  blast_table <- tibble::rowid_to_column(
-    blast_table,
-    var = "res"
-  )
-
-  blast_table <- tidyr::pivot_wider(
-    blast_table,
-    names_from = "res",
-    values_from = base::seq_len(
-      base::ncol(blast_table)
-    ),
-    names_glue = "{res}_{.value}"
-  )
-
-  blast_table <- blast_table |>
-    dplyr::mutate(`Sequence` = stringr::str_replace_all(query_seqs, "\\s", "")) |>
-    dplyr::relocate(tidyr::starts_with("10_")) |>
-    dplyr::relocate(tidyr::starts_with("9_")) |>
-    dplyr::relocate(tidyr::starts_with("8_")) |>
-    dplyr::relocate(tidyr::starts_with("7_")) |>
-    dplyr::relocate(tidyr::starts_with("6_")) |>
-    dplyr::relocate(tidyr::starts_with("5_")) |>
-    dplyr::relocate(tidyr::starts_with("4_")) |>
-    dplyr::relocate(tidyr::starts_with("3_")) |>
-    dplyr::relocate(tidyr::starts_with("2_")) |>
-    dplyr::relocate(tidyr::starts_with("1_")) |>
-    dplyr::relocate("Sequence") |>
-    dplyr::select(-tidyr::ends_with(c("_res", "_query")))
-
-  return(blast_table)
+  return(blast_res)
 }

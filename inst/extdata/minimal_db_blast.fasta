@@ -13,7 +13,7 @@ ATTCTCTACAAACCACAAAGACATTGGAACACTATACCTATTATTCGGCGCATGAGCTGGAGTCCTAGGCACAGCTCTAA
 GCCTCCTTATTCGAGCCGAGCTGGGCCAGCCAGGCAACCTTCTAGGTAACGACCACATCTACAACGTTATCGTCACAGCC
 CATGCATTTGTAATAATCTTCTTCATAGTAATACCCATCATAATCGGAGGCTTTGGCAACTGACTAGTTCCCCTAATAAT
 CGGTGCCCCCGATATG
->KX381515.1 Hydrochoerus hydrochaeris isolate M194 12S ribosomal RNA gene, partial sequence; mitochondrial >KX381584.1 Hydrochoerus hydrochaeris isolate M79 12S ribosomal RNA gene, partial sequence; mitochondrial >KX381638.1 Hydrochoerus hydrochaeris isolate T1618 12S ribosomal RNA gene, partial sequence; mitochondrial
+>KX381515.1 Hydrochoerus hydrochaeris isolate M194 12S ribosomal RNA gene, partial sequence; mitochondrial
 CTCAAACTGGGATTAGATACCCCACTATGCTTAGCCATAAACATAAAAGTTCACATAACAAGAACTTTCGCCCGAGAACT
 ACTAGCAACAGCTTAAAACTCAAAGGACTTGGCGGTGCTTTATATCCAC
 >MH611404.1 Archegozetes longisetosus voucher 8106_010 cytochrome c oxidase subunit I gene, partial cds; mitochondrial
@@ -34,7 +34,7 @@ TACGAGCACAAACGCTTAAAACTCTAAGGACTTGGCGGTGCCCCAAACCCAC
 >KF209672.1 Piabina argentea isolate S298 12S ribosomal RNA gene, partial sequence; mitochondrial
 GGGATTAGATACCCCACTATGCTTAGCCTTAAACCTAGATGTTAAATTTACAAGCAACATCCGCCAGGGTACTACAAGCG
 CTAGCTTAAAACCCAAAGGACTTGACGGTGTCTCAGACCCAC
->HM405192.1 Pimelodus fur voucher DCC00658 cytochrome oxidase subunit 1 (COI) gene, partial cds; mitochondrial >HM405197.1 Pimelodus fur voucher DCC01157 cytochrome oxidase subunit 1 (COI) gene, partial cds; mitochondrial
+>HM405192.1 Pimelodus fur voucher DCC00658 cytochrome oxidase subunit 1 (COI) gene, partial cds; mitochondrial
 CCTCTACTTAGTATTCGGTGCCTGAGCCGGAATAGTTGGCACAGCCCTTAGCCTTCTAATTCGGGCAGAGCTGGCCCAAC
 CTGGCGCCCTCCTAGGTGATGATCAAATTTACAACGTTATCGTTACTGCT
 >GU701891.1 Plagioscion squamosissimus voucher LBP-20158 cytochrome oxidase subunit 1 (COI) gene, partial cds; mitochondrial
@@ -57,7 +57,7 @@ ACGAGCAAACGCTTAAAACTCTAAGGACTTGGCGGTGCCCTAAACCCCC
 >KR020500.1 Mus musculus strain CAST/EiJ mitochondrion, complete genome
 CCCAAACTGGGATTAGATACCCCACTATGCTTAGCCATAAACCTAAATAATTAAATTTAACAAAACTATTTGCCAGAGAA
 CTACTAGCCACAGCTTAAAACTCAAAGGACTTGGCGGTACTTTATATCCAT
->KX381421.1 Sapajus apella isolate M1106 12S ribosomal RNA gene, partial sequence; mitochondrial >KX381589.1 Sapajus apella isolate M867 12S ribosomal RNA gene, partial sequence; mitochondrial >KX381614.1 Sapajus apella isolate M954 12S ribosomal RNA gene, partial sequence; mitochondrial >KX381658.1 Sapajus apella isolate T2387 12S ribosomal RNA gene, partial sequence; mitochondrial >KX381777.1 Sapajus apella isolate T6747 12S ribosomal RNA gene, partial sequence; mitochondrial
+>KX381421.1 Sapajus apella isolate M1106 12S ribosomal RNA gene, partial sequence; mitochondrial
 TACAAACTGGGATTAGATACCCCACTATGCTTAGCCTTAAACCCCAATAACTCCACCAACAAAACTATTCGCCAGAACAC
 TACAAGCAATAGCTTAAAACTCAAAGGACCTGGCGGTGCTTTATATCCGT
 >JN989232.1 Serrasalmus marginatus voucher LBPV-17335 cytochrome oxidase subunit 1 (COI) gene, partial cds; mitochondrial
@@ -112,7 +112,7 @@ CTACTAGCAATAGCTTAAAACTCAAAGGACTTGGCGGTGCTTTACATCCCT
 >KX381634.1 Nasua nasua isolate T1560 12S ribosomal RNA gene, partial sequence; mitochondrial
 CCCAAACTGGGATTAGATACCCCACTATGCTTAGCCCTAAACATAGATAATTTTAATATAACAAAATTGCATGCCAGAGA
 ACTACTAGCAACAGCTTAAAACTCAAAGGACTTGGCGGTGCTTTATATCCC
->KX381509.1 Panthera onca isolate M1875 12S ribosomal RNA gene, partial sequence; mitochondrial >KX381533.1 Panthera onca isolate M33 12S ribosomal RNA gene, partial sequence; mitochondrial >KX381628.1 Panthera onca isolate T1069 12S ribosomal RNA gene, partial sequence; mitochondrial
+>KX381509.1 Panthera onca isolate M1875 12S ribosomal RNA gene, partial sequence; mitochondrial
 TCCAAACTGGGATTAGATACCCCACTATGCTTAGCCCTAAACCTAGATAGTTAGCTCAAACAAAACTATCCGCCAGAGAA
 CTACTAGCAACAGCTTAAAACTCAAAGGACTTGGCGGTGCTTTATATCCCT
 >KX902240.1 Patagioenas fasciata monilis mitochondrion, complete genome
@@ -127,7 +127,7 @@ ACTAGCAACAGCCTAAAACTCAAAGGACTTGACGGTGCTTCATATCCAT
 >XR_004027927.1 PREDICTED: Nomascus leucogenys uncharacterized LOC115832432 (LOC115832432), ncRNA
 CTCAAACTGGGATTAGATACCCCACTATGCTTAGTTCTAAACCCAAATAGTTCAACCAACAAAACTATTCACCAGAGTAC
 TACAAGCAACAGCTTAAGACTCAAAAGACTTGGCAGTGCTTTATATCCCT
->MG755611.1 Prochilodus costatus isolate LGC0664 small subunit ribosomal RNA gene, partial sequence; mitochondrial >MG755612.1 Prochilodus costatus isolate LGC1281 small subunit ribosomal RNA gene, partial sequence; mitochondrial >MG755613.1 Prochilodus costatus isolate LGC1339 small subunit ribosomal RNA gene, partial sequence; mitochondrial
+>MG755611.1 Prochilodus costatus isolate LGC0664 small subunit ribosomal RNA gene, partial sequence; mitochondrial
 AACAAACTGGGATTAGATACCCCACTATGCTTAGCCTTAAACTCAGATGTTACAAATACAAATAACATCCGCCAGGGTAC
 TACAAGCGCTAGCTTAAAACCCAAAGGACTTGACGGTGTCTCAGACCCAC
 >MN885912.1 Caiman latirostris voucher St. Augustine Alligator Farm Zoological Park ID# S234 mitochondrion, complete genome

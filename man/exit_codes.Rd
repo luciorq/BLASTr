@@ -7,12 +7,32 @@
 exit_codes(blast_res)
 }
 \arguments{
-\item{blast_res}{A data frame containing the results of a BLAST search.}
+\item{blast_res}{A tibble returned by \code{\link[=parallel_blast]{parallel_blast()}} or
+\code{\link[=get_blast_results]{get_blast_results()}}.}
 }
 \value{
-A data frame with the exit codes and standard error messages.
+A tibble with columns \code{query_seq}, \code{exit_code}, and
+\code{stderr}. \code{exit_code} is \code{0} for successful queries, the BLAST+
+exit status for tool failures, or \code{-1} when the R-level parallel
+worker itself failed (e.g. a crashed daemon). \code{stderr} holds the
+full standard error output of the BLAST+ invocation that produced
+the query's result — including non-fatal per-query warnings such
+as \code{"Sequence contains no data"} — or \code{NA} when the run produced
+no diagnostic output.
 }
 \description{
-This function extracts the exit codes and standard error messages from the
-results of a BLAST search performed using the \code{\link[=parallel_blast]{parallel_blast()}} function.
+This function extracts the per-query exit codes and standard error
+messages from the results of a BLAST search performed with
+\code{\link[=parallel_blast]{parallel_blast()}} or \code{\link[=get_blast_results]{get_blast_results()}} (stored in the
+\code{BLASTr_metadata} attribute of the returned tibble).
+}
+\examples{
+\dontrun{
+blast_res <- parallel_blast(
+  query_seqs = "CTAGCCATAAACTTAAATGAAGCTATACTAA",
+  db_path = "path/to/blast_db"
+)
+exit_codes(blast_res)
+}
+
 }

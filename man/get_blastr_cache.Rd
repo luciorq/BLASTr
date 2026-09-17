@@ -9,8 +9,8 @@ get_blastr_cache(..., ext = NULL)
 \arguments{
 \item{...}{Additional path components to append to the cache directory.}
 
-\item{ext}{An optional file extension (e.g., "rds", "csv") to append to
-the final path.}
+\item{ext}{An optional file extension (e.g., \code{"rds"}, \code{"csv"}) to
+append to the final path.}
 }
 \value{
 A path character string representing the path to the user cache
@@ -23,6 +23,6 @@ On macOS, it avoids using paths with spaces and follows the XDG base
 directory specification.
 }
 \details{
-This function uses the \verb{[tools::R_user_dir()]} function to determine the
-user cache directory.
+This function uses \code{\link[tools:R_user_dir]{tools::R_user_dir()}} to determine the user cache
+directory.
 }

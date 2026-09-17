@@ -1,16 +1,147 @@
 ---
-title: "BLASTr-intro"
+title: "Introduction to BLASTr"
 vignette: >
-  %\VignetteIndexEntry{BLASTr-intro}
+  %\VignetteIndexEntry{Introduction to BLASTr}
   %\VignetteEngine{quarto::html}
   %\VignetteEncoding{UTF-8}
 knitr:
   opts_chunk:
     collapse: true
     comment: '#>'
+    eval: false
 ---
 
 ```{r}
 #| label: setup
+#| eval: true
 library(BLASTr)
 ```
+
+`BLASTr` runs BLAST+ searches from R, tailored for taxonomic
+classification of Amplicon Sequence Variants (ASVs) from metabarcoding
+and metagenomic experiments. All chunks below are not evaluated when the
+package is built (they require network access and external tools), but
+can be run interactively.
+
+## Installing command-line dependencies
+
+`BLASTr` manages its command-line dependencies (BLAST+, Entrez Direct,
+and seqkit) in dedicated conda environments through the `condathis`
+package.
+The first call to any function that needs a tool will install it
+automatically; you can also install everything up front:
+
+```{r}
+#| label: install-deps
+install_dependencies()
+```
+
+Pinned tool versions are installed for reproducibility. To upgrade the
+environments later, run `install_dependencies(force = TRUE)`.
+
+## Building a BLAST database
+
+Any FASTA file with unique headers can be turned into a BLAST+ database:
+
+```{r}
+#| label: make-db
+fasta_path <- fs::path_package(
+  "BLASTr", "extdata", "minimal_db_blast",
+  ext = "fasta"
+)
+taxid_map <- fs::path_package(
+  "BLASTr", "extdata", "minimal_db_blast",
+  ext = "txt"
+)
+db_path <- fs::path_temp("minimal_db_blast")
+
+make_blast_db(
+  fasta_path = fasta_path,
+  db_path = db_path,
+  db_type = "nucl",
+  taxid_map = taxid_map
+)
+```
+
+The optional `taxid_map` file (one `<SequenceId> <TaxonomyId>` pair per
+line) makes BLAST results include subject Tax IDs (`staxid`), which can
+then be resolved to full lineages with `parallel_get_tax()`.
+
+## Searching sequences in parallel
+
+`parallel_blast()` deduplicates the query sequences, groups them into
+multi-record FASTA batches, and dispatches the batches to parallel
+workers (`mirai` daemons). Failed batches are salvaged per-sequence and
+retried.
+
+```{r}
+#| label: parallel-blast
+asvs <- readLines(
+  fs::path_package("BLASTr", "extdata", "asvs_test", ext = "txt")
+)
+
+blast_res <- parallel_blast(
+  query_seqs = asvs,
+  db_path = db_path,
+  total_cores = 2,
+  num_alignments = 4
+)
+
+blast_res
+```
+
+The result has one row per unique query sequence, with the top
+`num_alignments` hits spread into `1_`, `2_`, ... column groups
+(subject header, identity, alignment coordinates, e-value, bit score,
+query coverage, and subject Tax ID).
+
+Every query's BLAST exit status and error/warning output is preserved:
+
+```{r}
+#| label: exit-codes
+exit_codes(blast_res)
+```
+
+## Retrieving taxonomy
+
+Tax IDs from the BLAST hits can be resolved into full taxonomic
+lineages using NCBI Entrez Direct. Requests are batched (up to 100 Tax
+IDs per request):
+
+```{r}
+#| label: get-tax
+tax_ids <- unique(blast_res$`1_staxid`)
+
+tax_tbl <- parallel_get_tax(
+  organisms_taxIDs = tax_ids,
+  total_cores = 1
+)
+
+tax_tbl
+```
+
+You can also search NCBI Taxonomy by organism name:
+
+```{r}
+#| label: get-tax-name
+get_tax_by_name("Danio rerio")
+```
+
+Note that NCBI enforces API rate limits (3 requests per second without
+an API key, 10 with one). Entrez Direct honors the `NCBI_API_KEY`
+environment variable automatically.
+
+## Performance notes
+
+- **Batching** is the main speed lever: each BLAST+ process loads the
+  database index once and searches many queries. Control it with
+  `chunk_size` (default: automatic, targeting ~4 chunks per core).
+- **`total_cores`** sets how many BLAST+ processes run concurrently;
+  `num_threads` sets threads per process. Effective CPU usage is
+  `total_cores * num_threads`.
+- If the [mori](https://cran.r-project.org/package=mori) package is
+  installed, the deduplicated query vector is shared with workers
+  through OS shared memory (zero-copy), which matters for very large
+  query sets.
+- If your session already has `mirai::daemons()` set, `BLASTr` uses the
+  existing pool instead of creating a new one.

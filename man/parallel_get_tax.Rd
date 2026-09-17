@@ -9,28 +9,50 @@ parallel_get_tax(
   parse_result = TRUE,
   total_cores = 1L,
   retry_times = 10L,
+  batch_size = 100L,
   verbose = c("silent", "cmd", "output", "full"),
   env_name = "blastr-entrez-env"
 )
 }
 \arguments{
-\item{organisms_taxIDs}{A character vector of NCBI Taxonomy Tax IDs to retrieve taxonomy information for.}
+\item{organisms_taxIDs}{A character vector of NCBI Taxonomy Tax IDs to
+retrieve taxonomy information for.}
 
-\item{parse_result}{Logical indicating whether to parse the taxonomy information into a tibble (\code{TRUE}, default) or return the raw output as returned by \code{efetch} (\code{FALSE}).}
+\item{parse_result}{Logical indicating whether to parse the taxonomy
+information into a wide tibble (\code{TRUE}, default) or return the long
+lineage table (\code{FALSE}).}
 
-\item{total_cores}{Integer specifying the number of cores to use for parallel processing. Defaults to \code{1}.}
+\item{total_cores}{Integer specifying the number of parallel requests.
+Defaults to \code{1}. If \code{\link[mirai:daemons]{mirai::daemons()}} are already set for the
+session, the existing pool is used as-is.}
 
-\item{retry_times}{Integer specifying the number of times to retry fetching taxonomy information if it fails. Defaults to \code{10}.}
+\item{retry_times}{Integer specifying the number of times to retry
+fetching taxonomy information if it fails. Defaults to \code{10}.}
 
-\item{verbose}{Character string indicating whether to print verbose messages during the process. Default is \code{silent}.}
+\item{batch_size}{Maximum number of Tax IDs per \code{efetch} request.
+Defaults to \code{100}.}
 
-\item{env_name}{Character string specifying the name of the conda environment where \code{efetch} is installed. Default is \code{"blastr-entrez-env"}.}
+\item{verbose}{Verbosity level. One of \code{"silent"} (default), \code{"cmd"},
+\code{"output"}, or \code{"full"}.}
+
+\item{env_name}{Name of the conda environment where Entrez Direct is
+installed. Defaults to \code{"blastr-entrez-env"}.}
 }
 \value{
 A tibble containing the taxonomic ranks for the given Tax IDs.
 }
 \description{
-Retrieves taxonomy ranks for a list of NCBI Taxonomy Tax IDs using parallel processing. The function queries the NCBI database and can retry fetching taxonomy information multiple times if initial attempts fail.
+Retrieves taxonomy ranks for a list of NCBI Taxonomy Tax IDs. Tax IDs
+are batched (up to 100 per \code{efetch} request) and batches are dispatched
+to \code{\link[mirai:daemons]{mirai::daemons()}} with \code{\link[mirai:mirai_map]{mirai::mirai_map()}} when \code{total_cores > 1}.
+Failed or missing Tax IDs are retried up to \code{retry_times} times.
+}
+\details{
+Note that NCBI enforces API rate limits (3 requests per second without
+an API key, 10 with one — set the \code{NCBI_API_KEY} environment variable,
+which Entrez Direct honors automatically). Batching keeps the request
+count low, but avoid very high \code{total_cores} values against NCBI
+servers.
 }
 \examples{
 \dontrun{

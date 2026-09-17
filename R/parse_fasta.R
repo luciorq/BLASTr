@@ -1,10 +1,11 @@
-#' @title Parsing fasta file to sequences only
+#' @title Parse FASTA File into Sequences
 #'
-#' @description Extract sequences From FASTA file
+#' @description Extract the sequences from a FASTA file, dropping
+#'   headers and joining multi-line records.
 #'
-#' @param file_path Path to FASTA file.
+#' @param file_path Path to the FASTA file.
 #'
-#' @returns vector containing the sequences.
+#' @returns A character vector containing the sequences.
 #'
 #' @examples
 #' fasta_path <- fs::path_package("BLASTr", "extdata", "minimal_db_blast", ext = "fasta")
@@ -12,15 +13,10 @@
 #'
 #' @export
 parse_fasta <- function(file_path) {
-  # TODO: @luciorq Remove when proper way of importing crate is found
-  declare(carrier::crate)
-
-  # TODO: @luciorq Add check for file read access
-  # + e.g.: `fs::file_access(file_path, mode = "read")`
   if (isFALSE(fs::file_exists(file_path))) {
     cli::cli_abort(
       c(
-        x = "{.file file_path} do not exist."
+        x = "{.file {file_path}} does not exist."
       ),
       class = "blastr_fasta_file_not_readable"
     )

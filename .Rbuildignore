@@ -35,5 +35,6 @@
 ^vignettes/articles$
 ^vignettes/articles/\.quarto$
 ^vignettes/articles/*_files$
-^README_files/$
+^README_files$
 ^readme_cache/$
+^TODO\.md$

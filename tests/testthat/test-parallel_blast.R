@@ -202,3 +202,15 @@ testthat::test_that("parallel_blast - depracated arguments", {
   testthat::expect_equal(nrow(blast_res), 6L)
   testthat::expect_equal(ncol(blast_res), 57L)
 })
+
+testthat::test_that("get_blast_results fails loudly when every query fails", {
+  testthat::skip_on_cran()
+  testthat::skip_if_offline()
+
+  get_blast_results(
+    query_seqs = "CTAGCCATAAACTTAAATGAAGCTATACTAA",
+    db_path = "/not/a/real/blast_db",
+    verbose = "silent"
+  ) |>
+    testthat::expect_error(class = "blastr_run_blast_error")
+})

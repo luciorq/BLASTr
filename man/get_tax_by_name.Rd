@@ -2,31 +2,45 @@
 % Please edit documentation in R/get_tax_by_name.R
 \name{get_tax_by_name}
 \alias{get_tax_by_name}
-\title{Get taxonomy ranks using \emph{NCBI Taxonomy Tax ID}}
+\title{Retrieve Taxonomic Ranks Using Organism Names}
 \usage{
 get_tax_by_name(
   organisms_names,
   parse_result = TRUE,
-  verbose = FALSE,
-  env_name = "entrez-env"
+  verbose = c("silent", "cmd", "output", "full"),
+  env_name = "blastr-entrez-env"
 )
 }
 \arguments{
-\item{organisms_names}{Vector of \emph{NCBI Taxonomy Tax ID} to retrieve taxonomy for.}
+\item{organisms_names}{Character vector of organism names (e.g.
+scientific names) to retrieve taxonomy for.}
 
-\item{parse_result}{Should the taxonomy be returned as the \code{efetch} returns it or should it be parsed into a tibble.}
+\item{parse_result}{Logical indicating whether to parse the taxonomy
+information into a wide tibble (\code{TRUE}, default) or return the long
+lineage table (\code{FALSE}).}
 
-\item{verbose}{Character string indicating whether to print verbose messages during the process. Default is \code{silent}.}
+\item{verbose}{Verbosity level. One of \code{"silent"} (default), \code{"cmd"},
+\code{"output"}, or \code{"full"}.}
 
-\item{env_name}{Character string specifying the name of the conda environment where \code{efetch} is installed. Default is \code{"blastr-entrez-env"}.}
-
-\item{total_cores}{Number of threads to use. Defaults to 1.}
-
-\item{show_command}{Should the \code{efetch} command on command line be printed for debugging. Defaults to TRUE.}
+\item{env_name}{Name of the conda environment where Entrez Direct is
+installed. Defaults to \code{"blastr-entrez-env"}.}
 }
 \value{
-A tibble with all the taxonomic ranks for the corresponding taxID.
+A tibble with the taxonomic ranks for the matching organisms.
+Names with no match in NCBI Taxonomy are absent from the result.
 }
 \description{
-Recover complete taxonomy for a given \emph{NCBI Taxonomy Tax ID}
+Recover complete taxonomy for organism names by searching
+the NCBI Taxonomy database (\code{esearch}) and fetching the matching
+records (\code{efetch}). The output schema matches \code{\link[=get_tax_by_taxID]{get_tax_by_taxID()}},
+with an additional \code{query_name} column mapping each result back to
+the searched name.
+}
+\examples{
+\dontrun{
+tax_info <- get_tax_by_name("Danio rerio")
+
+tax_info <- get_tax_by_name(c("Homo sapiens", "Danio rerio"))
+}
+
 }

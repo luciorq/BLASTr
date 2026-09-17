@@ -6,7 +6,7 @@
 \usage{
 make_blast_db(
   fasta_path,
-  db_path,
+  db_path = NULL,
   db_type = "nucl",
   taxid_map = NULL,
   parse_seqids = TRUE,
@@ -17,22 +17,29 @@ make_blast_db(
 \arguments{
 \item{fasta_path}{Path to the input FASTA file.}
 
-\item{db_path}{Path to the output BLAST database.}
+\item{db_path}{Path prefix for the output BLAST database files.
+Defaults to \code{NULL}, which creates the database alongside the input
+FASTA file (BLAST+ \code{makeblastdb} default). Provide a path in a
+writable directory when the FASTA file lives in a read-only location
+(e.g. an installed package directory).}
 
-\item{db_type}{Type of database to create, either "nucl" or "prot".}
+\item{db_type}{Type of database to create, either \code{"nucl"} or \code{"prot"}.}
 
-\item{taxid_map}{Optional path to a file mapping sequence IDs to
-taxonomy IDs.}
+\item{taxid_map}{Optional path to a file mapping sequence IDs to NCBI
+Taxonomy IDs, passed to \code{makeblastdb -taxid_map}. The file must have
+one \verb{<SequenceId> <TaxonomyId>} pair per line. Requires
+\code{parse_seqids = TRUE}.}
 
-\item{parse_seqids}{Whether to parse sequence IDs.}
+\item{parse_seqids}{Whether to parse sequence IDs (\code{-parse_seqids}).}
 
-\item{verbose}{Should \verb{[condathis::run()]} internal command be shown?}
+\item{verbose}{Verbosity level. One of \code{"silent"} (default), \code{"cmd"},
+\code{"output"}, or \code{"full"}.}
 
-\item{env_name}{The name of the conda environment with the parameter
-(i.e. "blastr-blast-env").}
+\item{env_name}{Name of the conda environment used to run the
+command-line tools. Defaults to \code{"blastr-blast-env"}.}
 }
 \value{
-The result of the \code{makeblastdb} command.
+Invisibly returns the result of the \code{makeblastdb} command.
 }
 \description{
 Create a BLAST database from a FASTA file.

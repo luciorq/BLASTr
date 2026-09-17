@@ -16,6 +16,7 @@ parallel_blast(
   num_alignments = 4L,
   retry_times = 3L,
   mt_mode = c("2", "1", "0"),
+  chunk_size = NULL,
   verbose = c("progress", "silent", "cmd", "output", "full"),
   env_name = "blastr-blast-env",
   asvs = deprecated(),
@@ -24,24 +25,31 @@ parallel_blast(
 )
 }
 \arguments{
-\item{query_seqs}{Character vector with sequences.}
+\item{query_seqs}{Character vector with sequences to be searched.}
 
 \item{db_path}{Path to the formatted BLAST database.}
 
 \item{...}{These dots are for future extensions and must be empty.}
 
-\item{total_cores}{Number of parallel BLAST processes to run.}
+\item{total_cores}{Number of parallel BLAST processes to run. If
+\code{\link[mirai:daemons]{mirai::daemons()}} are already set for the session, the existing
+pool is used as-is and this argument only influences chunking.}
 
-\item{num_threads}{Number of threads/cores to run each BLAST process on.}
+\item{num_threads}{Number of threads/cores to run each BLAST process
+on. Passed on to BLAST+ \code{-num_threads}. Note that the effective
+maximum CPU usage is \code{total_cores * num_threads}.}
 
-\item{blast_type}{BLAST+ executable to be used on search.}
+\item{blast_type}{BLAST+ executable to be used on search. One of:
+\code{c("blastn", "blastp", "blastx", "tblastn", "tblastx")}.}
 
-\item{perc_id}{Lowest identity percentage cutoff.}
+\item{perc_id}{Lowest identity percentage cutoff.
+Passed on to BLAST+ \code{-perc_identity}.}
 
-\item{perc_qcov_hsp}{Lowest query coverage per HSP percentage cutoff.}
+\item{perc_qcov_hsp}{Lowest query coverage per HSP percentage cutoff.
+Passed on to BLAST+ \code{-qcov_hsp_perc}.}
 
-\item{num_alignments}{Number of alignments to retrieve results for each query
-sequence. Defaults to \code{4}.}
+\item{num_alignments}{Number of alignments to retrieve for each query
+sequence. Passed on to BLAST+ \code{-num_alignments}. Defaults to \code{4}.}
 
 \item{retry_times}{Number of times to retry failed BLAST jobs.
 Defaults to \code{3} attempts.}
@@ -49,10 +57,17 @@ Defaults to \code{3} attempts.}
 \item{mt_mode}{Multithreading mode to be used by BLAST+.
 One of: \code{c("2", "1", "0")}. See BLAST+ manual for details.}
 
-\item{verbose}{Strategy used for showing outputting internal commands.
-Defaults to "progress".}
+\item{chunk_size}{Number of query sequences per BLAST+ invocation.
+Defaults to \code{NULL}, which targets about four chunks per core
+(capped at 500 sequences per chunk).}
 
-\item{env_name}{The name of the conda environment used to run
+\item{verbose}{Verbosity level. One of \code{"progress"} (default),
+\code{"silent"}, \code{"cmd"}, \code{"output"}, or \code{"full"}. \code{"progress"} shows a
+progress bar in interactive sessions and is otherwise equivalent to
+\code{"silent"}; the remaining levels are passed on to the underlying
+command execution.}
+
+\item{env_name}{Name of the conda environment used to run the
 command-line tools. Defaults to \code{"blastr-blast-env"}.}
 
 \item{asvs}{Deprecated. Same as \code{query_seqs}. Use \code{query_seqs} instead.}
@@ -64,10 +79,28 @@ directory.}
 directory.}
 }
 \value{
-A tibble with the BLAST tabular output.
+A tibble with one row per unique query sequence and the BLAST
+tabular output spread into \verb{1_}–\verb{<num_alignments>_} prefixed column
+groups. Per-query exit codes and error messages are stored in the
+\code{BLASTr_metadata} attribute (see \code{\link[=exit_codes]{exit_codes()}}).
 }
 \description{
-Run parallel BLAST for a set of sequences
+Run parallel BLAST for a set of sequences.
+
+Unique query sequences are batched into multi-record FASTA chunks so
+that each BLAST+ process handles many queries at once (amortizing
+process startup and database loading), and chunks are dispatched to
+\code{\link[mirai:daemons]{mirai::daemons()}} with \code{\link[mirai:mirai_map]{mirai::mirai_map()}}. When the \code{mori} package
+is installed, the query set is placed in shared memory
+(\code{\link[mori:share]{mori::share()}}) so parallel workers receive a zero-copy reference
+instead of a full copy of the sequences.
+
+If a chunk fails (non-zero BLAST exit status), its member sequences
+are automatically re-run individually to rescue healthy queries and
+attribute the error to the offending ones, which are then retried up
+to \code{retry_times} times. Per-query BLAST warnings (e.g. empty or
+malformed records inside an otherwise successful batch) are captured
+and exposed through \code{\link[=exit_codes]{exit_codes()}}.
 }
 \examples{
 \dontrun{
@@ -77,12 +110,12 @@ dna_fasta_path <- fs::path_package(
 )
 temp_db_path <- fs::path_temp("minimal_db_blast")
 make_blast_db(fasta_path = dna_fasta_path, db_path = temp_db_path)
-asvs_string <- c(
+query_seqs_string <- c(
   "CTAGCCATAAACTTAAATGAAGCTATACTAA",
   "ACTCGTTCGCCAGAGTACTACAAGCGAAAG"
 )
 blast_res <- parallel_blast(
-  query_seqs = asvs_string,
+  query_seqs = query_seqs_string,
   db_path = temp_db_path
 )
 blast_res

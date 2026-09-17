@@ -12,30 +12,45 @@ get_tax_by_taxID(
 )
 }
 \arguments{
-\item{organisms_taxIDs}{A character vector of NCBI Taxonomy Tax IDs for which to retrieve taxonomy information.}
+\item{organisms_taxIDs}{A character vector of NCBI Taxonomy Tax IDs for
+which to retrieve taxonomy information.}
 
-\item{parse_result}{Logical indicating whether to parse the taxonomy information into a tibble (\code{TRUE}, default) or return the raw output as returned by \code{efetch} (\code{FALSE}).}
+\item{parse_result}{Logical indicating whether to parse the taxonomy
+information into a wide tibble (\code{TRUE}, default) or return the long
+lineage table (\code{FALSE}).}
 
-\item{verbose}{Character indicating whether to print verbose messages during the process. Default is \code{"silent"}.}
+\item{verbose}{Verbosity level. One of \code{"silent"} (default), \code{"cmd"},
+\code{"output"}, or \code{"full"}.}
 
-\item{env_name}{Character string specifying the name of the conda environment where \code{efetch} is installed. Default is \code{"blastr-entrez-env"}.}
+\item{env_name}{Name of the conda environment where Entrez Direct is
+installed. Defaults to \code{"blastr-entrez-env"}.}
 }
 \value{
 A tibble containing the taxonomic ranks for the given Tax IDs.
+Tax IDs that cannot be retrieved are absent from the result.
 }
 \description{
-Retrieves complete taxonomy information for given NCBI Taxonomy Tax IDs by querying the NCBI database using the \code{efetch} command.
+Retrieves complete taxonomy information for given NCBI Taxonomy Tax IDs
+by querying the NCBI database using the \code{efetch} command. Multiple Tax
+IDs are fetched in a single batched request. Each record in the
+response is matched back to its Tax ID through the XML \verb{<TaxId>}
+element, so results are correct regardless of response order.
+}
+\details{
+Note: NCBI Taxonomy replaced the \code{superkingdom} rank with \code{domain} in
+its 2024/2025 restructure; both are returned
+(\code{Domain (NCBI)} / \code{Superkingdom (NCBI)}).
 }
 \examples{
 \dontrun{
 # Retrieve taxonomy for a single Tax ID
 tax_info <- get_tax_by_taxID("9606") # Human
 
-# Retrieve taxonomy for multiple Tax IDs
+# Retrieve taxonomy for multiple Tax IDs (single batched request)
 tax_ids <- c("9606", "10090", "10116") # Human, Mouse, Rat
 tax_info <- get_tax_by_taxID(tax_ids)
 
-# Get unparsed taxonomy result
+# Get unparsed (long) taxonomy result
 raw_tax_info <- get_tax_by_taxID("9606", parse_result = FALSE)
 
 # Enable verbose output

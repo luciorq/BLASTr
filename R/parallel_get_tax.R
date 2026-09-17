@@ -1,13 +1,32 @@
 #' Retrieve Taxonomic Ranks for a List of NCBI Taxonomy Tax IDs in Parallel
 #'
-#' Retrieves taxonomy ranks for a list of NCBI Taxonomy Tax IDs using parallel processing. The function queries the NCBI database and can retry fetching taxonomy information multiple times if initial attempts fail.
+#' Retrieves taxonomy ranks for a list of NCBI Taxonomy Tax IDs. Tax IDs
+#' are batched (up to 100 per `efetch` request) and batches are dispatched
+#' to [mirai::daemons()] with [mirai::mirai_map()] when `total_cores > 1`.
+#' Failed or missing Tax IDs are retried up to `retry_times` times.
 #'
-#' @param organisms_taxIDs A character vector of NCBI Taxonomy Tax IDs to retrieve taxonomy information for.
-#' @param parse_result Logical indicating whether to parse the taxonomy information into a tibble (`TRUE`, default) or return the raw output as returned by `efetch` (`FALSE`).
-#' @param total_cores Integer specifying the number of cores to use for parallel processing. Defaults to `1`.
-#' @param retry_times Integer specifying the number of times to retry fetching taxonomy information if it fails. Defaults to `10`.
-#' @param verbose Character string indicating whether to print verbose messages during the process. Default is `silent`.
-#' @param env_name Character string specifying the name of the conda environment where `efetch` is installed. Default is `"blastr-entrez-env"`.
+#' Note that NCBI enforces API rate limits (3 requests per second without
+#' an API key, 10 with one — set the `NCBI_API_KEY` environment variable,
+#' which Entrez Direct honors automatically). Batching keeps the request
+#' count low, but avoid very high `total_cores` values against NCBI
+#' servers.
+#'
+#' @param organisms_taxIDs A character vector of NCBI Taxonomy Tax IDs to
+#'   retrieve taxonomy information for.
+#' @param parse_result Logical indicating whether to parse the taxonomy
+#'   information into a wide tibble (`TRUE`, default) or return the long
+#'   lineage table (`FALSE`).
+#' @param total_cores Integer specifying the number of parallel requests.
+#'   Defaults to `1`. If [mirai::daemons()] are already set for the
+#'   session, the existing pool is used as-is.
+#' @param retry_times Integer specifying the number of times to retry
+#'   fetching taxonomy information if it fails. Defaults to `10`.
+#' @param batch_size Maximum number of Tax IDs per `efetch` request.
+#'   Defaults to `100`.
+#' @param verbose Verbosity level. One of `"silent"` (default), `"cmd"`,
+#'   `"output"`, or `"full"`.
+#' @param env_name Name of the conda environment where Entrez Direct is
+#'   installed. Defaults to `"blastr-entrez-env"`.
 #'
 #' @returns A tibble containing the taxonomic ranks for the given Tax IDs.
 #'
@@ -28,119 +47,133 @@
 #' }
 #' @export
 parallel_get_tax <- function(
-  organisms_taxIDs,
+  organisms_taxIDs, # nolint: object_name_linter
   parse_result = TRUE,
   total_cores = 1L,
   retry_times = 10L,
+  batch_size = 100L,
   verbose = c("silent", "cmd", "output", "full"),
   env_name = "blastr-entrez-env"
 ) {
+  rlang::check_required(organisms_taxIDs)
   verbose <- rlang::arg_match(verbose)
-  organisms_taxIDs <- unique(organisms_taxIDs)
+  taxids_to_run <- unique(
+    stringr::str_trim(as.character(organisms_taxIDs))
+  )
+  taxids_to_run <- taxids_to_run[
+    !rlang::are_na(taxids_to_run) & nzchar(taxids_to_run)
+  ]
 
-  check_cmd(cmd = "efetch", env_name = env_name)
+  check_cmd(cmd = "efetch", env_name = env_name, verbose = verbose)
 
-  parallel_set <- FALSE
+  run_verbose <- ifelse(
+    verbose %in% c("cmd", "output", "full"),
+    verbose,
+    "silent"
+  )
 
-  if (
-    isTRUE(length(organisms_taxIDs) > 1L) &&
-      isTRUE(total_cores > 1L) &&
-      isTRUE(mirai::status()$connections < total_cores)
+  # Standalone worker: fetches raw XML on the daemon; parsing happens in
+  # the main process (cheap relative to the network round-trip).
+  fetch_worker <- make_tax_fetch_worker(
+    env_name = env_name,
+    verbose = run_verbose
+  )
+
+  # A pre-existing daemon pool is adopted regardless of `total_cores`;
+  # otherwise a pool is created when the workload spans multiple batches
+  # and `total_cores > 1`, with guaranteed teardown.
+  parallel_var <- FALSE
+  if (isTRUE(mirai::daemons_set())) {
+    parallel_var <- TRUE
+  } else if (
+    isTRUE(total_cores > 1L) &&
+      isTRUE(length(taxids_to_run) > batch_size)
   ) {
-    # TODO: @luciorq add withr defer instead of stopping daemons at the end
     mirai::daemons(n = total_cores)
-    # NOTE: @luciorq only set to true if daemons were created by this function
-    parallel_set <- TRUE
-  }
-
-  if (rlang::is_true(parse_result)) {
-    results <- tibble::tibble(
-      "Sci_name" = character(0L),
-      "query_taxID" = character(0L),
-      # "Division (NCBI)" = character(0L),
-      "Superkingdom (NCBI)" = character(0L),
-      "Kingdom (NCBI)" = character(0L),
-      "Phylum (NCBI)" = character(0L),
-      "Subphylum (NCBI)" = character(0L),
-      "Class (NCBI)" = character(0L),
-      "Subclass (NCBI)" = character(0L),
-      "Order (NCBI)" = character(0L),
-      "Suborder (NCBI)" = character(0L),
-      "Family (NCBI)" = character(0L),
-      "Subfamily (NCBI)" = character(0L),
-      "Genus (NCBI)" = character(0L)
+    withr::defer(
+      expr = {
+        mirai::daemons(n = 0L)
+      }
     )
+    parallel_var <- TRUE
   }
 
-  if (rlang::is_false(parse_result)) {
-    # create empty tibble for binding
-    results <- tibble::tibble(
-      "Rank" = character(0L),
-      "ScientificName" = character(0L),
-      "query_taxID" = character(0L),
-      "Sci_name" = character(0L)
-    )
+  run_batches <- function(batch_list) {
+    if (isTRUE(parallel_var) && isTRUE(mirai::daemons_set())) {
+      map_res <- mirai::mirai_map(.x = batch_list, .f = fetch_worker)
+      return(mirai::collect_mirai(map_res))
+    }
+    purrr::map(.x = batch_list, .f = fetch_worker)
   }
 
-  res_taxid <- character(0L)
+  tax_long_list <- list()
+  pending_ids <- taxids_to_run
   retry_count <- 0L
-  while (
-    isTRUE(retry_count <= retry_times) &&
-      isFALSE(all(organisms_taxIDs %in% res_taxid))
-  ) {
-    message(paste0("retrying ", retry_count, " of ", retry_times))
 
-    results_temp <- purrr::map(
-      .x = organisms_taxIDs,
-      .f = purrr::in_parallel(
-        .f = \(x) {
-          get_tax_by_taxID(
-            organisms_taxIDs = x,
-            parse_result = parse_result,
-            env_name = env_name,
-            verbose = verbose
-          )
-        },
-        parse_result = parse_result,
-        env_name = env_name,
-        verbose = verbose,
-        get_tax_by_taxID = get_tax_by_taxID
-      )
-    ) |>
-      purrr::list_rbind()
+  while (isTRUE(length(pending_ids) > 0L)) {
+    batch_list <- chunk_indices(pending_ids, batch_size)
+    batch_results <- run_batches(batch_list)
 
-    if (identical(class(results_temp), "data.frame")) {
-      class(results_temp) <- c("tbl_df", "tbl", "data.frame")
+    for (batch_res in batch_results) {
+      if (isTRUE(mirai::is_error_value(batch_res))) {
+        next
+      }
+      if (isFALSE(batch_res$status == 0L)) {
+        next
+      }
+      batch_long_tbl <- parse_tax_xml(batch_res$stdout)
+      if (!rlang::is_null(batch_long_tbl)) {
+        # Keep only requested IDs (merged-ID records are emitted under
+        # both their old and new Tax IDs by the parser).
+        batch_long_tbl <- dplyr::filter(
+          batch_long_tbl,
+          .data$query_taxID %in% taxids_to_run
+        )
+        tax_long_list <- c(tax_long_list, list(batch_long_tbl))
+      }
     }
 
-    retry_count <- retry_count + 1L
+    retrieved_ids <- character(0L)
+    if (isTRUE(length(tax_long_list) > 0L)) {
+      retrieved_ids <- unique(
+        purrr::list_rbind(tax_long_list)$query_taxID
+      )
+    }
+    pending_ids <- taxids_to_run[!(taxids_to_run %in% retrieved_ids)]
 
-    results <- dplyr::bind_rows(results, results_temp) |>
-      dplyr::distinct()
-
-    # taxids that were found
-    res_taxid <- unique(results$query_taxID)
-    # missing taxids
-    organisms_taxIDs <- organisms_taxIDs[
-      !(organisms_taxIDs %in% results$query_taxID)
-    ]
+    if (isTRUE(length(pending_ids) > 0L)) {
+      if (isTRUE(retry_count >= retry_times)) {
+        break
+      }
+      retry_count <- retry_count + 1L
+      if (isFALSE(identical(verbose, "silent"))) {
+        cli::cli_inform(
+          c(
+            `i` = "Retrying {length(pending_ids)} Tax ID{?s}: attempt {retry_count} of {retry_times}." # nolint: line_length_linter
+          )
+        )
+      }
+      # Increasing backoff between retry rounds: be polite to NCBI and
+      # give transient failures time to clear.
+      Sys.sleep(min(retry_count, 5L))
+    }
   }
 
-  # message for problematic taxIDs
   if (
-    length(organisms_taxIDs[!(organisms_taxIDs %in% results$query_taxID)]) != 0L
+    isTRUE(length(pending_ids) > 0L) &&
+      isFALSE(identical(verbose, "silent"))
   ) {
-    message(paste0(
-      "The following taxIDs could not be retrieved even after ",
-      retry_times,
-      " attempts:\n",
-      organisms_taxIDs[!(organisms_taxIDs %in% results$query_taxID)]
-    ))
+    cli::cli_inform(
+      c(
+        `!` = "The following Tax ID{?s} could not be retrieved after {retry_times} attempt{?s}: {.val {pending_ids}}." # nolint: line_length_linter
+      )
+    )
   }
 
-  if (isTRUE(total_cores > 1L) && isTRUE(parallel_set)) {
-    mirai::daemons(n = 0L)
+  tax_long_tbl <- NULL
+  if (isTRUE(length(tax_long_list) > 0L)) {
+    tax_long_tbl <- dplyr::distinct(purrr::list_rbind(tax_long_list))
   }
 
-  return(results)
+  return(format_tax_tbl(tax_long_tbl, parse_result = parse_result))
 }

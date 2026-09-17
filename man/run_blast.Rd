@@ -5,7 +5,7 @@
 \title{Run BLAST}
 \usage{
 run_blast(
-  asv,
+  query_seqs,
   db_path,
   num_alignments = 4L,
   num_threads = 1L,
@@ -17,17 +17,18 @@ run_blast(
 )
 }
 \arguments{
-\item{asv}{Vector of sequences to be BLASTed.}
+\item{query_seqs}{Character vector with sequences to be searched.}
 
-\item{db_path}{Complete path do formatted BLAST database.}
+\item{db_path}{Path to the formatted BLAST database.}
 
-\item{num_alignments}{Number of alignments to retrieve from BLAST. Max = 6.}
+\item{num_alignments}{Number of alignments to retrieve for each query
+sequence. Passed on to BLAST+ \code{-num_alignments}. Defaults to \code{4}.}
 
 \item{num_threads}{Number of threads to run BLAST on.
 Passed on to BLAST+ argument \code{-num_threads}.}
 
-\item{blast_type}{One of the available BLAST+ search engines,
-#'   one of: \code{c("blastn", "blastp", "blastx", "tblastn", "tblastx")}.}
+\item{blast_type}{BLAST+ executable to be used on search. One of:
+\code{c("blastn", "blastp", "blastx", "tblastn", "tblastx")}.}
 
 \item{perc_id}{Lowest identity percentage cutoff.
 Passed on to BLAST+ \code{-perc_identity}.}
@@ -35,29 +36,44 @@ Passed on to BLAST+ \code{-perc_identity}.}
 \item{perc_qcov_hsp}{Lowest query coverage per HSP percentage cutoff.
 Passed on to BLAST+ \code{-qcov_hsp_perc}.}
 
-\item{verbose}{Should condathis::run() internal command be shown?}
+\item{verbose}{Verbosity level. One of \code{"silent"} (default), \code{"cmd"},
+\code{"output"}, or \code{"full"}.}
 
-\item{env_name}{The name of the conda environment used to run
-command-line tools (i.e. "blastr-blast-env").}
+\item{env_name}{Name of the conda environment used to run the
+command-line tools. Defaults to \code{"blastr-blast-env"}.}
 }
 \value{
-Unformatted BLAST results.
-For results formatted as tibble, please use \verb{[get_blast_results()]}
+Unformatted BLAST results (the raw process result, with
+\code{status}, \code{stdout}, and \code{stderr}). \code{stdout} is BLAST+ tabular
+output in format \code{"6 std qcovhsp staxid stitle"} — 15
+tab-separated fields: the 12 standard outfmt-6 columns followed by
+\code{qcovhsp}, \code{staxid}, and \code{stitle} (subject title), with query IDs
+in the generated \verb{BLASTrQ<i>} form. (Before version 0.2.0, the
+output had 14 fields and no \code{stitle}.) For results formatted as a
+tibble, please use \code{\link[=get_blast_results]{get_blast_results()}}.
 }
 \description{
-Run BLAST for a single sequence and return raw results.
-For formatted results, use the function \verb{[BLASTr::get_blastn_results()]}.
+Run BLAST for one or more sequences and return the raw
+process results. For results formatted as a tibble, use
+\code{\link[=get_blast_results]{get_blast_results()}} or \code{\link[=parallel_blast]{parallel_blast()}}.
+
+Each sequence is written as its own FASTA record (with generated
+\verb{BLASTrQ<i>} headers), so multiple sequences are searched as separate
+queries in a single BLAST+ invocation.
 }
 \examples{
 \dontrun{
 
-dna_fasta_path <- fs::path_package("BLASTr", "extdata", "minimal_db_blast", ext = "fasta")
+dna_fasta_path <- fs::path_package(
+  "BLASTr", "extdata", "minimal_db_blast",
+  ext = "fasta"
+)
 temp_db_path <- fs::path_temp("minimal_db_blast")
 make_blast_db(fasta_path = dna_fasta_path, db_path = temp_db_path)
-asvs_string <- "CTAGCCATAAACTTAAATGAAGCTATACTAAACTCGTTCGCCAG
+query_seqs_string <- "CTAGCCATAAACTTAAATGAAGCTATACTAAACTCGTTCGCCAG
 AGTACTACAAGCGAAAGCTTAAAACTCATAGGACTTGGCGGTGTTTCAGACCCAC"
 blast_res <- run_blast(
-  asv = asvs_string,
+  query_seqs = query_seqs_string,
   db_path = temp_db_path
 )
 }

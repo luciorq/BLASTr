@@ -2,18 +2,19 @@
 % Please edit documentation in R/parse_fasta.R
 \name{parse_fasta}
 \alias{parse_fasta}
-\title{Parsing fasta file to sequences only}
+\title{Parse FASTA File into Sequences}
 \usage{
 parse_fasta(file_path)
 }
 \arguments{
-\item{file_path}{Path to FASTA file.}
+\item{file_path}{Path to the FASTA file.}
 }
 \value{
-vector containing the sequences.
+A character vector containing the sequences.
 }
 \description{
-Extract sequences From FASTA file
+Extract the sequences from a FASTA file, dropping
+headers and joining multi-line records.
 }
 \examples{
 fasta_path <- fs::path_package("BLASTr", "extdata", "minimal_db_blast", ext = "fasta")

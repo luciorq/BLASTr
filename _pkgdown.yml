@@ -4,3 +4,35 @@ template:
   bootstrap: 5
   light-switch: true
   llm-docs: true
+
+reference:
+  - title: BLAST searches
+    desc: >
+      Run BLAST+ searches for query sequences, in parallel or serially,
+      and inspect per-query exit codes.
+    contents:
+      - parallel_blast
+      - get_blast_results
+      - run_blast
+      - exit_codes
+  - title: BLAST databases
+    desc: Build and query local BLAST databases.
+    contents:
+      - make_blast_db
+      - get_fasta_header
+      - parse_fasta
+  - title: Taxonomy
+    desc: >
+      Resolve NCBI Taxonomy IDs or organism names into full taxonomic
+      lineages via Entrez Direct.
+    contents:
+      - parallel_get_tax
+      - get_tax_by_taxID
+      - get_tax_by_name
+  - title: Sequence quality control
+    contents:
+      - search_primers_on_fq
+  - title: Setup and utilities
+    contents:
+      - install_dependencies
+      - get_blastr_cache

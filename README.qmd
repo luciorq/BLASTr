@@ -36,11 +36,17 @@ With `BLASTr`, you can efficiently perform taxonomic classification of your sequ
 
 ## Features
 
-- **Parallel BLAST Searches:** Run multiple BLAST searches concurrently to significantly speed up your analysis.
+- **Batched, Parallel BLAST Searches:** Query sequences are grouped into
+  multi-record FASTA batches (amortizing BLAST+ startup and database loading)
+  and batches run concurrently on [`mirai`](https://mirai.r-lib.org/) daemons.
+  With the optional [`mori`](https://cran.r-project.org/package=mori) package
+  installed, workers read the query set from shared memory with zero copying.
+- **Resilient Execution:** Failed batches are automatically salvaged
+  (healthy queries keep their results), failing queries are retried, and
+  per-query exit codes and error messages are available via `exit_codes()`.
 - **Automated Dependency Management:** `BLASTr` automatically installs and manages BLAST+ and Entrez Direct dependencies using `condathis`, ensuring a hassle-free setup.
-- **Taxonomic Classification:** Retrieve detailed taxonomic information for your sequences using their NCBI Taxonomy IDs.
-- **Flexible and Easy to Use:** The package provides a set of intuitive functions that simplify the process of running thousands of BLAST searches and handling the results.
-- **Reproducible Research:** By managing dependencies in isolated Conda environments, `BLASTr` helps ensure that your analyses are reproducible.
+- **Taxonomic Classification:** Retrieve detailed taxonomic information for your sequences using their NCBI Taxonomy IDs (batched Entrez Direct requests), or search taxa by name.
+- **Reproducible Research:** By managing dependencies in isolated Conda environments (with pinned versions), `BLASTr` helps ensure that your analyses are reproducible.
 
 ## Installation
 
@@ -74,7 +80,7 @@ BLASTr::install_dependencies(verbose = "silent", force = FALSE)
 
 ## Obtain NCBI databases
 
-To obtain complet NCBI blast formated databases, procees as follows
+To obtain complete NCBI BLAST formatted databases, proceed as follows
 ```{bash}
 #| eval: false
 
@@ -101,11 +107,12 @@ ls *tar.gz | parallel tar -xvzf {} 
 
 ```
 
-## Making local custom databeses
+## Making local custom databases
 
-You can turn any _.fasta_ file with unique headers into a BLAST+ formated database using the _*BLASTr*_ function _make_blast_db_. It is recomended that the unique identifier of each sequence do not contain *.*. You may provide a _.txt_ with the same name as the DB's _.fasta_ file, formated _lcl|_<SequenceId> <TaxonomyId><newline>.
+You can turn any _.fasta_ file with unique headers into a BLAST+ formatted database using the `make_blast_db()` function.
+Optionally, provide a `taxid_map` file mapping each sequence identifier to an NCBI Taxonomy ID (one `<SequenceId> <TaxonomyId>` pair per line, passed to `makeblastdb -taxid_map`), so that BLAST results include the subject Tax ID (`staxid`).
 
-If you want to retrieve _subject Scientific name_  on the results, you can download and extract the *taxdb* files from NCBI, as mentioned above. 
+If you want to retrieve the _subject Scientific name_ in the results, you can download and extract the *taxdb* files from NCBI, as mentioned above, and point the `BLASTDB` environment variable to the directory containing them.
 
 ```{r}
 #| label: make-blast-db
@@ -125,36 +132,22 @@ asvs <- c(
   "TTAGCCATAAACATAAAAGTTCACATAACAAGAACTTTTGCCCGAGAACTACTAGCAACAGCTTAAAACTCAAAGGACTTGGCGGTGCTTTATATCCAC"
 )
 
-# Path to your local FASTA database
+# Path to your local FASTA file
 fasta_path <- fs::path_package("BLASTr", "extdata", "minimal_db_blast", ext = "fasta")
-# Path to your local Tax ID map file
+# Optional: taxid map with one "<SequenceId> <TaxonomyId>" pair per line,
+# so BLAST results include the subject Tax ID (staxid)
 taxid_map <- fs::path_package("BLASTr", "extdata", "minimal_db_blast", ext = "txt")
-# Path to database
+# Path prefix for the database to be created
 db_path <- fs::path_temp("minimal_db_blast")
-
-
-# BLAST+ requires that the taxid_map file is composede of two columns, separated
-#  by a space. The 1st is a unique ID (no . allowed), the first word of the header.
-#  It must be preceeded by "lcl|".
-#  THe 2nd is the taxID.
 
 make_blast_db(
   fasta_path = fasta_path,
+  db_path = db_path,
+  db_type = "nucl",
   taxid_map = taxid_map
-  db_type = "nucl"
 )
 
-head(readLines(fasta_path))
-
 file.exists(paste0(db_path, ".ndb"))
-
-# pra o ssciname funcionar tem que exportar a variavel 
-# 
-# tem que exportar essa variavel pra funcionar!!!!!
-# export BLASTDB=/data/databases/core_nt:/data/databases/core_nt:$BLASTDB
-
-
-
 ```
 
 ```{r}
@@ -200,21 +193,26 @@ print(taxonomic_info)
 
 - `install_dependencies()`: Installs BLAST+ and Entrez Direct if they are not found on your system.
 - `make_blast_db()`: Creates a BLAST database from a FASTA file.
-- `parallel_blast()`: Runs BLAST searches for multiple sequences in parallel.
+- `parallel_blast()`: Runs BLAST searches for multiple sequences in parallel (batched).
 - `exit_codes()`: Retrieve the exit codes and STDERR messages from BLAST searches.
-- `parallel_get_tax()`: Retrieves taxonomic information for multiple NCBI Taxonomy IDs in parallel.
+- `parallel_get_tax()`: Retrieves taxonomic information for multiple NCBI Taxonomy IDs in parallel (batched).
+- `get_tax_by_taxID()`: Retrieves taxonomic ranks for NCBI Taxonomy IDs.
+- `get_tax_by_name()`: Searches NCBI Taxonomy by organism name and retrieves taxonomic ranks.
+- `get_blast_results()`: Runs BLAST serially and returns the same formatted tibble as `parallel_blast()`.
 - `run_blast()`: A lower-level function to run a BLAST search and return the raw output.
 - `parse_fasta()`: Extracts sequences from a FASTA file.
 - `get_fasta_header()`: Retrieves the full header of a sequence from a BLAST database.
 
 ## Dependency Management
 
-`BLASTr` uses the `condathis` package to manage its dependencies (BLAST+ and Entrez Direct).
+`BLASTr` uses the `condathis` package to manage its command-line dependencies (BLAST+, Entrez Direct, and seqkit).
 When you run a function that requires one of these tools, `BLASTr` will automatically check if it's installed.
-If not, it will create a Conda environment and install the necessary software.
+If not, it will create a Conda environment and install the necessary software (with pinned versions for reproducibility).
 This ensures that you always have the correct versions of the dependencies without having to install them manually.
 
-You can control the installation process with the `force` and `verbose` arguments in the `install_dependencies()` function.
+You can control the installation process with the `force` and `verbose` arguments in the `install_dependencies()` function (`force = TRUE` also serves as the upgrade path).
+
+Advanced: the conda package specifications can be overridden per tool family, e.g. `options(blastr.conda.blast = "<channel>::<package>==<version>")` (similarly `blastr.conda.entrez`, `blastr.conda.seqkit`, and `blastr.conda.channels`), which is also the hook for testing platform-specific builds such as upcoming Windows packages.
 
 ## Contributing
 

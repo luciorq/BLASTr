@@ -1,13 +1,16 @@
-#' @title Get header from SubjectID
+#' @title Get Sequence Headers from Subject IDs
 #'
-#' @description Retrieve complete sequence header from BLAST DB based on
-#'   SubjectIDs
+#' @description Retrieve the complete sequence titles stored in a BLAST
+#'   database for one or more subject IDs.
 #'
 #' @inheritParams run_blast
 #'
-#' @param id SubjectID from BLAST results or any NCBI Nucleotide identifier.
+#' @param id One or more SubjectIDs from BLAST results (any identifier
+#'   present in the database). Multiple IDs are fetched in a single
+#'   `blastdbcmd` call.
 #'
-#' @returns Complete identifier for the SubjectID as is on the database.
+#' @returns Character vector with the complete title for each SubjectID
+#'   as stored in the database.
 #'
 #' @examples
 #' \dontrun{
@@ -45,17 +48,36 @@ get_fasta_header <- function(
     action = "replace"
   )
 
+  # Fetch accession alongside title so results can be aligned to the
+  # requested IDs: blastdbcmd outputs entries in database order, and a
+  # bare title stream can misalign when titles are empty.
   blastdbcmd_res <- condathis::run_bin(
     "blastdbcmd",
     "-db",
     db_path,
     "-entry",
-    id,
+    paste(id, collapse = ","),
     "-outfmt",
-    "%t",
+    "%a\t%t",
     env_name = env_name,
     verbose = verbose
   )
 
-  return(blastdbcmd_res$stdout)
+  header_lines <- strsplit(
+    stringr::str_trim(blastdbcmd_res$stdout),
+    "\n",
+    fixed = TRUE
+  )[[1]]
+  accession_vec <- stringr::str_remove(header_lines, "\t.*$")
+  title_vec <- rlang::set_names(
+    stringr::str_trim(
+      stringr::str_remove(header_lines, "^[^\t]*\t?")
+    ),
+    accession_vec
+  )
+  if (isTRUE(all(id %in% accession_vec))) {
+    # Return titles aligned to (and named by) the requested IDs.
+    return(title_vec[as.character(id)])
+  }
+  return(title_vec)
 }

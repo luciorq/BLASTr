@@ -2,7 +2,7 @@
 % Please edit documentation in R/get_fasta_header.R
 \name{get_fasta_header}
 \alias{get_fasta_header}
-\title{Get header from SubjectID}
+\title{Get Sequence Headers from Subject IDs}
 \usage{
 get_fasta_header(
   id,
@@ -12,21 +12,25 @@ get_fasta_header(
 )
 }
 \arguments{
-\item{id}{SubjectID from BLAST results or any NCBI Nucleotide identifier.}
+\item{id}{One or more SubjectIDs from BLAST results (any identifier
+present in the database). Multiple IDs are fetched in a single
+\code{blastdbcmd} call.}
 
-\item{db_path}{Complete path do formatted BLAST database.}
+\item{db_path}{Path to the formatted BLAST database.}
 
-\item{env_name}{The name of the conda environment used to run
-command-line tools (i.e. "blastr-blast-env").}
+\item{env_name}{Name of the conda environment used to run the
+command-line tools. Defaults to \code{"blastr-blast-env"}.}
 
-\item{verbose}{Should condathis::run() internal command be shown?}
+\item{verbose}{Verbosity level. One of \code{"silent"} (default), \code{"cmd"},
+\code{"output"}, or \code{"full"}.}
 }
 \value{
-Complete identifier for the SubjectID as is on the database.
+Character vector with the complete title for each SubjectID
+as stored in the database.
 }
 \description{
-Retrieve complete sequence header from BLAST DB based on
-SubjectIDs
+Retrieve the complete sequence titles stored in a BLAST
+database for one or more subject IDs.
 }
 \examples{
 \dontrun{

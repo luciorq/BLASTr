@@ -78,6 +78,8 @@ if (!(!interactive() && !isTRUE(as.logical(Sys.getenv("NOT_CRAN", "false"))))) {
 
   # For local testing use:
   # + `tmp_blast_db_path <- fs::file_temp("minimal_db_blast_")`
+  # The database is built with the packaged taxid map so that tests also
+  # exercise the `staxid` path end to end.
   make_blast_db(
     fasta_path = fs::path_package(
       "BLASTr",
@@ -87,6 +89,12 @@ if (!(!interactive() && !isTRUE(as.logical(Sys.getenv("NOT_CRAN", "false"))))) {
     ),
     db_path = tmp_blast_db_path,
     db_type = "nucl",
+    taxid_map = fs::path_package(
+      "BLASTr",
+      "extdata",
+      "minimal_db_blast",
+      ext = "txt"
+    ),
     verbose = "silent"
   )
 

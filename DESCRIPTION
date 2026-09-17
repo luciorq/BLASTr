@@ -1,6 +1,6 @@
 Package: BLASTr
 Title: Parallel Taxonomic Classification of Metabarcoding Sequences
-Version: 0.1.7
+Version: 0.2.0
 Authors@R: c(
     person("Lucio", "Queiroz", , "luciorqueiroz@gmail.com", role = "aut",
            comment = c(ORCID = "0000-0002-6090-1834")),
@@ -10,8 +10,8 @@ Authors@R: c(
 Description: Seamlessly run 'BLAST' searches within 'R', tailored for ASV
     (Amplicon Sequence Variant) analysis. This package offers a robust set
     of functions designed to efficiently identify and process sequences
-    from high-throughput metagenomicmetagenomic experiments, following
-    best practices for sequence data analysis.
+    from high-throughput metabarcoding and metagenomic experiments,
+    following best practices for sequence data analysis.
 License: MIT + file LICENSE
 URL: https://github.com/heronoh/BLASTr, https://heronoh.github.io/BLASTr/
 BugReports: https://github.com/heronoh/BLASTr/issues
@@ -20,29 +20,35 @@ Depends:
 Imports:
     carrier (>= 0.2.0),
     cli,
-    condathis (>= 0.1.2),
-    dplyr,
+    condathis (>= 0.2.0),
+    dplyr (>= 1.1.0),
     fs,
     lifecycle,
     mirai (>= 2.4.1),
     purrr (>= 1.1.0),
     readr,
     rlang,
+    stats,
     stringr,
     tibble,
     tidyr,
+    tools,
+    withr,
     xml2
 Suggests:
     curl,
     knitr,
+    mori,
     quarto,
-    testthat (>= 3.0.0),
-    withr
+    testthat (>= 3.0.0)
 VignetteBuilder:
     quarto
+Remotes:
+    luciorq/condathis
 Config/Needs/website: quarto
 Config/testthat/edition: 3
-Config/testthat/parallel: true
+Config/testthat/parallel: false
 Encoding: UTF-8
+Language: en-US
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
+Config/roxygen2/version: 8.1.0

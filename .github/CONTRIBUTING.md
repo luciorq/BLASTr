@@ -65,3 +65,44 @@ See our guide on [how to create a great issue](https://code-review.tidyverse.org
 Please note that the BLASTr project is released with a
 [Contributor Code of Conduct](./CODE_OF_CONDUCT.md) derived from the [Contributor Covenant](https://www.contributor-covenant.org/) v2.1.
 By contributing to this project you agree to abide by its terms.
+
+## Pinned command-line tool versions
+
+`BLASTr` installs its command-line dependencies (BLAST+, Entrez Direct,
+seqkit) into conda environments with **pinned versions**. The pins live
+in a single place: `blastr_conda_pins` in `R/check_cmd.R`.
+
+Maintainer policy for updating a pin:
+
+1. Pins reference exact upstream releases (e.g. `bioconda::blast==2.16`)
+   and are bumped **only in a minor release** (`0.x.0`), never in a
+   patch release.
+2. Before bumping, confirm the new version is available on bioconda for
+   every supported platform (linux-64, osx-64/osx-arm64, and — once the
+   dedicated packages exist — Windows).
+3. Bump the value in `blastr_conda_pins`, then run the full test suite
+   locally with fresh environments (`install_dependencies(force = TRUE)`
+   first, or rely on the hermetic test setup, which builds environments
+   from scratch). CI also builds environments from scratch, so a green
+   run validates the pins on every platform in the matrix.
+4. Record the change in `NEWS.md` with the old and new tool versions,
+   and mirror it in the `?install_dependencies` documentation.
+5. User environments are never upgraded implicitly;
+   `install_dependencies(force = TRUE)` is the documented upgrade path.
+
+At runtime, users can override any spec without a package change via
+`options(blastr.conda.blast = ...)` / `blastr.conda.entrez` /
+`blastr.conda.seqkit` / `blastr.conda.channels` — useful for testing
+candidate builds (e.g. platform-specific packages) before they become
+the pinned default.
+
+### Fallback packages
+
+Tool families may declare a *fallback* conda specification in
+`blastr_conda_pins` / `conda_pkg_spec()` (`R/check_cmd.R`), tried
+automatically when the primary bioconda/conda-forge spec cannot be
+installed on the current platform. The BLAST+ family falls back to the
+zig-toolchain `blast-zig` builds from <https://prefix.dev/universe>,
+which cover all platforms including Windows. Fallback pins follow the
+same update policy as primary pins (pin exact versions once published;
+bump only in minor releases; record in NEWS).

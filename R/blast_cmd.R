@@ -1,3 +1,6 @@
+# Internal single-query wrapper around the shared BLAST engine worker.
+# Kept for backwards compatibility with internal callers and tests;
+# returns the raw process result without raising on non-zero exit status.
 blast_cmd <- function(
   query_str,
   db_path,
@@ -10,42 +13,19 @@ blast_cmd <- function(
   verbose = "silent",
   env_name = "blastr-blast-env"
 ) {
-  query_path <- withr::local_tempfile(
-    pattern = "blast_input_",
-    fileext = "fasta"
-  )
-  base::cat(query_str, file = query_path)
-  withr::local_envvar(
-    .new = list(
-      BLAST_USAGE_REPORT = "false",
-      NCBI_DONT_USE_NCBIRC = "true",
-      NCBI_DONT_USE_LOCAL_CONFIG = "true"
-    ),
-    action = "replace"
-  )
-  blast_res <- condathis::run_bin(
-    blast_type,
-    "-db",
-    db_path,
-    "-query",
-    query_path,
-    "-outfmt",
-    "6 std qcovhsp staxid stitle",
-    "-max_hsps",
-    "1",
-    "-perc_identity",
-    perc_id,
-    "-qcov_hsp_perc",
-    perc_qcov_hsp,
-    "-num_alignments",
-    num_alignments,
-    "-num_threads",
-    num_threads,
-    "-mt_mode",
-    mt_mode,
-    env_name = env_name,
+  seqs_clean <- stringr::str_replace_all(query_str, "\\s", "")
+  worker <- make_blast_worker(
+    query_seqs = seqs_clean,
+    db_path = db_path,
+    num_alignments = num_alignments,
+    num_threads = num_threads,
+    blast_type = blast_type,
+    perc_id = perc_id,
+    perc_qcov_hsp = perc_qcov_hsp,
+    mt_mode = mt_mode,
     verbose = verbose,
-    error = "continue"
+    env_name = env_name
   )
-  return(blast_res)
+  worker_res <- worker(seq_along(seqs_clean))
+  return(worker_res)
 }

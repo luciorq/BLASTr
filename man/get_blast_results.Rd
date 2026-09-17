@@ -2,10 +2,10 @@
 % Please edit documentation in R/get_blast_results.R
 \name{get_blast_results}
 \alias{get_blast_results}
-\title{Run BLASTn}
+\title{Get Formatted BLAST Results}
 \usage{
 get_blast_results(
-  asv,
+  query_seqs,
   db_path,
   num_threads = 1L,
   blast_type = "blastn",
@@ -17,15 +17,15 @@ get_blast_results(
 )
 }
 \arguments{
-\item{asv}{Vector of sequences to be BLASTed.}
+\item{query_seqs}{Character vector with sequences to be searched.}
 
-\item{db_path}{Complete path do formatted BLAST database.}
+\item{db_path}{Path to the formatted BLAST database.}
 
 \item{num_threads}{Number of threads to run BLAST on.
 Passed on to BLAST+ argument \code{-num_threads}.}
 
-\item{blast_type}{One of the available BLAST+ search engines,
-#'   one of: \code{c("blastn", "blastp", "blastx", "tblastn", "tblastx")}.}
+\item{blast_type}{BLAST+ executable to be used on search. One of:
+\code{c("blastn", "blastp", "blastx", "tblastn", "tblastx")}.}
 
 \item{perc_id}{Lowest identity percentage cutoff.
 Passed on to BLAST+ \code{-perc_identity}.}
@@ -33,18 +33,25 @@ Passed on to BLAST+ \code{-perc_identity}.}
 \item{perc_qcov_hsp}{Lowest query coverage per HSP percentage cutoff.
 Passed on to BLAST+ \code{-qcov_hsp_perc}.}
 
-\item{num_alignments}{Number of alignments to retrieve from BLAST. Max = 6.}
+\item{num_alignments}{Number of alignments to retrieve for each query
+sequence. Passed on to BLAST+ \code{-num_alignments}. Defaults to \code{4}.}
 
-\item{verbose}{Should condathis::run() internal command be shown?}
+\item{verbose}{Verbosity level. One of \code{"silent"} (default), \code{"cmd"},
+\code{"output"}, or \code{"full"}.}
 
-\item{env_name}{The name of the conda environment used to run
-command-line tools (i.e. "blastr-blast-env").}
+\item{env_name}{Name of the conda environment used to run the
+command-line tools. Defaults to \code{"blastr-blast-env"}.}
 }
 \value{
-A \code{tibble} with the results of BLASTn for each sequence.
+A \code{tibble} with one row per unique query sequence and the
+BLAST tabular output spread into \verb{1_}–\verb{<num_alignments>_} prefixed
+column groups.
 }
 \description{
-Retrieve BLAST results from a given ASV
+Retrieve BLAST results as a tibble for one or more query
+sequences, running serially in the current process. For parallel
+execution over many sequences, use \code{\link[=parallel_blast]{parallel_blast()}} — both
+functions share the same engine and return the same format.
 }
 \examples{
 \dontrun{
@@ -54,9 +61,9 @@ dna_fasta_path <- fs::path_package(
 )
 temp_db_path <- fs::path_temp("minimal_db_blast")
 make_blast_db(fasta_path = dna_fasta_path, db_path = temp_db_path)
-asvs_string <- "CTAGCCATAAACTTAAATGAAGCTATACTAAACTCGTTCGCCAG
+query_seqs_string <- "CTAGCCATAAACTTAAATGAAGCTATACTAAACTCGTTCGCCAG
 AGTACTACAAGCGAAAGCTTAAAACTCATAGGACTTGGCGGTGTTTCAGACCCAC"
 
-get_blast_results(asv = asvs_string, db_path = temp_db_path)
+get_blast_results(query_seqs = query_seqs_string, db_path = temp_db_path)
 }
 }
