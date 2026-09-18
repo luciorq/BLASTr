@@ -128,14 +128,18 @@
 
 ## F. Windows / cross-OS
 
-- [~] **F1. Windows conda packages** — conda specs centralized in
-  `conda_pkg_spec()` (`R/check_cmd.R`), keyed on OS with a clear
-  Windows TODO marker; currently fails on Windows with an informative
-  classed error. **Owner plan:** slot in the dedicated Windows BLAST
-  conda package spec once released.
+- [x] **F1. Windows conda packages (BLAST+)** — done 2026-09-18: the
+  `blast` package on `https://prefix.dev/universe` (2.17.0, one
+  toolchain for linux-64/linux-aarch64/osx-64/osx-arm64/win-64) is now
+  the primary BLAST+ spec on every platform, with `bioconda::blast==2.17.0`
+  as fallback. Entrez Direct and seqkit remain Linux/macOS-only (L4).
 - [x] **F2. Env staleness** — `install_dependencies(force = TRUE)`
   documented as the upgrade path (vignette + README).
-- [ ] **F3. Re-enable Windows CI** once the Windows package exists.
+- [x] **F3. Windows CI re-enabled** (2026-09-18): `windows-latest` is
+  back in the matrix. Tests needing Entrez Direct / seqkit skip on
+  Windows via `skip_if_tool_unavailable()` (`helper-platform.R`);
+  `install_dependencies()` skips those families there instead of
+  aborting. First green Windows run pending (owner: watch CI).
 
 ## G. Remaining / follow-ups
 
@@ -213,9 +217,11 @@
   0.2.0 development version; CRAN has 0.1.4, so the old `>= 0.1.2` floor
   would have produced runtime failures for CRAN installs. `Remotes:
   luciorq/condathis` added for GitHub installs in the meantime.
-- [ ] **J2. RELEASE-ORDER CONSTRAINT: condathis 0.2.0 must be published
-  to CRAN before BLASTr can be submitted** (and the `Remotes:` field
-  removed at that point). Owner action (condathis is owner-maintained).
+- [x] **J2. Release-order constraint lifted (2026-09-18).** With Entrez
+  Direct gone (N2) the `stdin` pipe feature is unused; the floor is back
+  to CRAN `condathis (>= 0.1.4)` and `Remotes:` is removed. Verified by
+  running the tool-dependent suite against CRAN condathis 0.1.4 in an
+  isolated library (all green).
 - [x] **J3. `dplyr (>= 1.1.0)` floor added** (engine uses `mutate(.by=)`)
   and **`stats` declared in Imports** (`stats::setNames`).
 - [x] **J4. Workflows now install the quarto CLI**
@@ -271,13 +277,14 @@
   from `https://prefix.dev/universe` is installed instead (Windows no
   longer aborts for BLAST+). Overridable via
   `blastr.conda.blast_fallback` / `blastr.conda.fallback_channels`.
-- [ ] **L2. `blast-zig` is not yet visible on the `universe` channel**
-  (channel currently lists tradetracker, polyglot, r-zig-slim, marimo-r
-  only — verified via the prefix.dev GraphQL API). The fallback is
-  configuration-complete but cannot be integration-tested until the
-  package is published. **Owner actions:** publish `blast-zig` (win-64 +
-  linux/osx builds), then pin its exact version in
-  `blastr_conda_pins$blast_fallback` per the pin policy.
+- [x] **L2. universe BLAST+ package published** (as `blast`, not
+  `blast-zig`; 2.17.0 on all five platforms) and promoted to the primary
+  spec on 2026-09-18 (see F1). Verified live on linux-64: installs in
+  ~13 s, all 7 tools probe OK, `makeblastdb -taxid_map` + `blastn
+  -mt_mode 2` produce correct `staxid` hits. The noarch `blast-scripts`
+  metapackage (`blast==2.17.0` + perl + python) is available on the
+  same channel but not used: it does not include Entrez Direct or
+  seqkit, so it cannot replace those environments by itself.
 - [x] **L3. Environment installation/validation hardened**
   (`R/check_cmd.R`): post-install version-probe validation (probes
   verified to exit 0 for all 8 supported tools), once-per-session
@@ -285,11 +292,12 @@
   environments, classed errors (`blastr_env_install_error`,
   `blastr_env_validation_error`) carrying the underlying condition.
   Unit + integration tests added (`test-check_cmd.R`).
-- [ ] **L4. Entrez Direct / seqkit on Windows** still abort with an
-  informative error (no fallback builds yet); Windows CI (F3) stays
-  blocked on those since the test suite exercises taxonomy. Option:
-  a Windows CI job running only the BLAST-path tests once blast-zig is
-  published.
+- [ ] **L4. Entrez Direct / seqkit on Windows** still raise an
+  informative classed error on use (neither bioconda nor conda-forge
+  has win-64 builds, verified 2026-09-18). Windows CI now runs the
+  BLAST path and skips the taxonomy / primer-search tests. Candidate:
+  publish uniform builds on the universe channel like `blast`, then
+  drop `windows_guarded_spec()`.
 
 ## M. Round 6 (2026-09-05) — code-review findings applied
 
@@ -303,3 +311,118 @@
   in favor of preserving the full chunk stderr for every member —
   restores 0.1.7 stderr parity and keeps QC filters like
   `str_detect(stderr, "Examining")` working.
+
+## N. Round 7 (2026-09-18) — universe BLAST+, Windows CI, Entrez Direct removed
+
+- [x] **N1. BLAST+ from `universe::blast==2.17.0`** on every platform,
+  bioconda 2.17.0 fallback (see F1/L2). Windows CI re-enabled (F3).
+- [x] **N2. Entrez Direct dependency removed.** `R/eutils.R` is a small
+  NCBI E-utilities client (`curl` + `xml2`, POST, `tool`/`email`/
+  `api_key` params, per-process throttle 3/s or 10/s with key, retry
+  on 429/5xx/network with backoff). `get_tax_by_taxID()`,
+  `get_tax_by_name()`, `parallel_get_tax()` use it; `env_name` is
+  deprecated (lifecycle) and ignored; the crated worker runs unchanged
+  on mirai daemons (verified live). Taxonomy now works on Windows and
+  its tests no longer skip there. `curl` moved Suggests → Imports.
+- [x] **N3. Validation against the real Entrez Direct**
+  (`tests/testthat/test-eutils-vs-edirect.R`, Linux/macOS, installs
+  `bioconda::entrez-direct==24.0` into a test-only env): identical
+  parsed records for 7 valid + 1 invalid Tax IDs across Eukaryota /
+  Bacteria / Archaea, identical `esearch` ID sets for 6 names (incl. a
+  non-existent one), and the public API equals a reference built from
+  `efetch` XML (serial, parallel, and by-name). Offline unit tests with
+  mocked HTTP cover parsing, retries, joins, and deprecations
+  (`test-eutils.R`).
+- [x] **N4. seqkit dependency removed (2026-09-18).**
+  `search_primers_on_fq()` is pure R again, faithful to the co-author's
+  original goal (per file/primer: total reads, reads carrying the
+  primer, percentage; IUPAC degenerate primers; plain or gzip FASTQ),
+  with the original `parsed_primer` column restored, streaming in
+  chunks, both-strand matching, and correct read counting. Packaged toy
+  library `inst/extdata/toy_reads.fastq.gz` (script
+  `data-raw/make_toy_reads_fastq.R`) powers runnable examples, tests
+  and an evaluated vignette section. BLAST+ is now the only external
+  tool, available on every platform; `windows_guarded_spec()` and the
+  test skip helper are gone and Windows CI runs the full suite.
+## O. Round 8 (2026-09-18) — E-utilities client review (addressed 2026-09-18)
+
+External review of `R/eutils.R`, `R/tax_engine.R`, `R/parallel_get_tax.R`,
+`R/get_tax_by_name.R` against the two design concerns raised before the
+implementation (NCBI rate limits; the `esearch`/`efetch` query shapes).
+Verdict: both concerns are handled, with one real gap (O1) and one
+measured inefficiency (O2). Evidence was gathered live against NCBI on
+2026-09-18 with `pkgload::load_all()`.
+
+- [x] **O1. Throttle is per daemon, not per process — aggregate rate
+  exceeds NCBI's limit under `total_cores > 1`.**
+  `make_eutils_worker()` captures `eutils_state` in a `carrier::crate()`;
+  environments serialize *by copy*, so every `mirai` daemon receives its
+  own `last_request` slot. Verified: printing `environment(w)$state`
+  inside two daemons gives two distinct addresses (`0x5839…`, `0x58d3…`)
+  versus the main process (`0x5689…`). With `total_cores = 4` and no
+  key the aggregate is 4 × 3 = 12 req/s; NCBI answers 429, the worker's
+  backoff absorbs it, so nothing fails — but it is exactly the client
+  behaviour NCBI asks to avoid, and the NEWS/roxygen wording "throttles
+  to the NCBI per-second limits" is only true for the serial path.
+  Fix options (either suffices):
+  1. Scale the interval by pool size: `make_eutils_worker()` gains a
+     `rate_share` (or `n_workers`) argument and uses
+     `min_interval * n_workers` (`R/eutils.R:72`); `parallel_get_tax()`
+     passes the daemon count it created/adopted
+     (`mirai::status()$connections` or `total_cores`).
+  2. Drop daemons for E-utilities entirely: each request already
+     carries `batch_size = 100` IDs and NCBI is the bottleneck, so the
+     serial path retrieves ~300 lineages/s (3 req/s) — parallelism buys
+     nothing measurable. Keep `total_cores` as a no-op for API
+     stability or deprecate it.
+  Test idea: mock the HTTP layer, run with 3 daemons, assert the spacing
+  of recorded request timestamps ≥ `1/3 * 3` s.
+
+- [x] **O2. One unknown Tax ID costs ~40 s.** NCBI omits unknown IDs
+  from an otherwise successful `efetch` response; `parallel_get_tax()`
+  treats every ID missing from the result as transient and re-requests
+  it `retry_times` (10) times with growing sleeps. Measured:
+  `parallel_get_tax(c("9606", "999999999"))` → 42.6 s for one row.
+  Fix: an ID absent from a batch that returned HTTP 200 *and* parsed
+  (`parse_tax_xml()` non-`NULL`) is definitively unknown; only IDs from
+  batches with `status != 0` / unparsable bodies go back into
+  `pending_ids` (`R/parallel_get_tax.R:143`). Report the definitively
+  unknown IDs once, without retrying. Same applies to
+  `get_tax_by_name()`, which delegates to `parallel_get_tax()`.
+
+- [x] **O3. Retry multiplication (awareness, low priority).** The worker
+  retries 429/5xx/transport errors 3× with backoff, and
+  `parallel_get_tax()` retries failed batches up to 10 more rounds, so a
+  persistent 5xx costs up to ~30 requests per batch before giving up.
+  Acceptable; consider capping the outer loop lower (3–5) once O2 lands,
+  since genuinely transient failures clear within a few rounds.
+
+Resolution (2026-09-18):
+
+- O1: fix option 1. `make_eutils_worker(rate_share =)` multiplies the
+  per-request interval; `make_tax_fetch_worker()` forwards it and
+  `parallel_get_tax()` passes `mirai::status()$connections` (1 on the
+  serial path). Docs reworded (pool-wide throttle; `total_cores > 1`
+  mostly overlaps latency). Test: unreachable host, `rate_share = 3`,
+  second call waits >= 1 s.
+- O2: `tax_xml_is_valid()` (root element is `TaxaSet`). IDs absent from
+  a valid TaxaSet are definitively unknown: collected in `unknown_ids`,
+  reported once under verbose, never re-queued. Non-TaxaSet 200 bodies
+  and non-200/transport failures still retry. Verified live before the
+  fix: `parallel_get_tax(c("9606", "999999999"))` = 43.5 s; after:
+  0.4 s (one request). Mocked tests cover mixed batch, all-unknown
+  batch, and the transient-body retry path.
+- O3: accepted as is. With O2, only genuinely failing batches reach the
+  outer loop; the 3 x 10 worst case only occurs during a sustained NCBI
+  outage, where giving up early has no benefit. Default `retry_times`
+  unchanged.
+
+Confirmed correct (no action): API key read once in the main process and
+baked into the crate (daemons need no env var), sent in the POST body
+not the URL, redacted from verbose output; `tool`/`email` sent; POST
+for ID batches; merged-ID resolution via `<AkaTaxIds>`; records matched
+by `<TaxId>` not by order; `esearch` on taxonomy mirrors Entrez Direct
+(no field restriction → many-to-many join is the right call); descendant
+expansion (`txidNNN[Subtree]`, what `get_species_taxids.sh` adds) is not
+needed by BLASTr. Live check: `get_tax_by_name("Danio rerio")` → 7955,
+genus *Danio*.

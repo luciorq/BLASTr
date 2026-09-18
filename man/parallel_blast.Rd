@@ -80,7 +80,7 @@ directory.}
 }
 \value{
 A tibble with one row per unique query sequence and the BLAST
-tabular output spread into \verb{1_}–\verb{<num_alignments>_} prefixed column
+tabular output spread into \verb{1_}-\verb{<num_alignments>_} prefixed column
 groups. Per-query exit codes and error messages are stored in the
 \code{BLASTr_metadata} attribute (see \code{\link[=exit_codes]{exit_codes()}}).
 }

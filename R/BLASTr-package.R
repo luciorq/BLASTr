@@ -1,6 +1,7 @@
 #' @keywords internal
 #' @importFrom lifecycle deprecated
 #' @importFrom carrier crate
+#' @importFrom utils globalVariables
 #' @importFrom rlang .data
 "_PACKAGE"
 

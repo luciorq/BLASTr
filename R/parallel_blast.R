@@ -57,7 +57,7 @@
 #' @inheritParams rlang::args_dots_empty
 #'
 #' @returns A tibble with one row per unique query sequence and the BLAST
-#'   tabular output spread into `1_`–`<num_alignments>_` prefixed column
+#'   tabular output spread into `1_`-`<num_alignments>_` prefixed column
 #'   groups. Per-query exit codes and error messages are stored in the
 #'   `BLASTr_metadata` attribute (see [exit_codes()]).
 #'

@@ -24,12 +24,13 @@ reference:
   - title: Taxonomy
     desc: >
       Resolve NCBI Taxonomy IDs or organism names into full taxonomic
-      lineages via Entrez Direct.
+      lineages via the NCBI E-utilities (no command-line tool needed).
     contents:
       - parallel_get_tax
       - get_tax_by_taxID
       - get_tax_by_name
   - title: Sequence quality control
+    desc: Primer checks on raw FASTQ reads (pure R, no external tool).
     contents:
       - search_primers_on_fq
   - title: Setup and utilities

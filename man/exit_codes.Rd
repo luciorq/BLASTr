@@ -16,8 +16,8 @@ A tibble with columns \code{query_seq}, \code{exit_code}, and
 exit status for tool failures, or \code{-1} when the R-level parallel
 worker itself failed (e.g. a crashed daemon). \code{stderr} holds the
 full standard error output of the BLAST+ invocation that produced
-the query's result — including non-fatal per-query warnings such
-as \code{"Sequence contains no data"} — or \code{NA} when the run produced
+the query's result - including non-fatal per-query warnings such
+as \code{"Sequence contains no data"} - or \code{NA} when the run produced
 no diagnostic output.
 }
 \description{

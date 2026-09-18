@@ -1,12 +1,18 @@
-testthat::test_that("conda_pkg_spec returns fallback for the BLAST+ family", {
+testthat::test_that("conda_pkg_spec uses universe BLAST+ with bioconda fallback", {
   spec <- conda_pkg_spec("blastn")
   testthat::expect_equal(spec$packages, blastr_conda_pins$blast)
+  testthat::expect_equal(spec$channels[[1]], "https://prefix.dev/universe")
   testthat::expect_equal(
     spec$fallback$packages,
     blastr_conda_pins$blast_fallback
   )
-  testthat::expect_true(
-    any(grepl("prefix.dev/universe", spec$fallback$channels, fixed = TRUE))
+  testthat::expect_true("bioconda" %in% spec$fallback$channels)
+  # Primary and fallback pin the same BLAST+ release, so results do not
+  # depend on which source was installed.
+  extract_version <- function(x) sub(".*==", "", x)
+  testthat::expect_equal(
+    extract_version(spec$packages),
+    extract_version(spec$fallback$packages)
   )
   # Same spec for every BLAST+ family member.
   for (blast_cmd in c("tblastn", "blastx", "makeblastdb", "blastdbcmd")) {
@@ -14,27 +20,15 @@ testthat::test_that("conda_pkg_spec returns fallback for the BLAST+ family", {
   }
 })
 
-testthat::test_that("conda_pkg_spec has no fallback for entrez/seqkit", {
-  testthat::expect_null(conda_pkg_spec("efetch")$fallback)
-  testthat::expect_null(conda_pkg_spec("seqkit")$fallback)
-})
-
-testthat::test_that("conda_pkg_spec respects option overrides", {
-  withr::local_options(list(
-    blastr.conda.blast = "somechannel::someblast==1.0",
-    blastr.conda.blast_fallback = "otherchannel::otherblast==2.0",
-    blastr.conda.fallback_channels = "https://example.org/channel"
-  ))
-  spec <- conda_pkg_spec("blastn")
-  testthat::expect_equal(spec$packages, "somechannel::someblast==1.0")
-  testthat::expect_equal(
-    spec$fallback$packages,
-    "otherchannel::otherblast==2.0"
-  )
-  testthat::expect_equal(
-    spec$fallback$channels,
-    "https://example.org/channel"
-  )
+testthat::test_that("only the BLAST+ family is managed", {
+  # Taxonomy is fetched over HTTPS (R/eutils.R) and primer search runs
+  # in R, so neither Entrez Direct nor seqkit is a managed tool.
+  for (removed_cmd in c("efetch", "esearch", "xtract", "seqkit")) {
+    conda_pkg_spec(removed_cmd) |>
+      testthat::expect_error(class = "blastr_check_cmd_unsupported_cmd")
+  }
+  # BLAST+ is available on every platform.
+  testthat::expect_true(cmd_available_on_platform("blastn"))
 })
 
 testthat::test_that("conda_pkg_spec rejects unsupported commands", {

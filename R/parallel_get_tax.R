@@ -1,15 +1,25 @@
 #' Retrieve Taxonomic Ranks for a List of NCBI Taxonomy Tax IDs in Parallel
 #'
-#' Retrieves taxonomy ranks for a list of NCBI Taxonomy Tax IDs. Tax IDs
-#' are batched (up to 100 per `efetch` request) and batches are dispatched
-#' to [mirai::daemons()] with [mirai::mirai_map()] when `total_cores > 1`.
-#' Failed or missing Tax IDs are retried up to `retry_times` times.
+#' Retrieves taxonomy ranks for a list of NCBI Taxonomy Tax IDs from the
+#' NCBI E-utilities (`efetch`), directly over HTTPS - no command-line
+#' tool is required. Tax IDs are batched (up to `batch_size` per request)
+#' and batches are dispatched to [mirai::daemons()] with
+#' [mirai::mirai_map()] when `total_cores > 1`. Batches that fail
+#' (HTTP errors, network errors, malformed responses) are retried up to
+#' `retry_times` times; Tax IDs that NCBI reports as unknown (omitted
+#' from an otherwise valid response) are not retried.
 #'
-#' Note that NCBI enforces API rate limits (3 requests per second without
-#' an API key, 10 with one — set the `NCBI_API_KEY` environment variable,
-#' which Entrez Direct honors automatically). Batching keeps the request
-#' count low, but avoid very high `total_cores` values against NCBI
-#' servers.
+#' @section NCBI etiquette:
+#' NCBI enforces API rate limits: 3 requests per second without an API
+#' key, 10 with one. Set the `NCBI_API_KEY` environment variable to use a
+#' key (it is sent with every request); `options(blastr.ncbi.email = )`
+#' optionally identifies you to NCBI. Requests are throttled so that the
+#' whole worker pool stays within the limit (each of `total_cores`
+#' workers spaces its requests `total_cores` times wider), and transient
+#' failures (HTTP 429/5xx, network errors) are retried with backoff.
+#' Because each request already carries up to `batch_size` Tax IDs and
+#' the NCBI rate limit is the bottleneck, `total_cores > 1` rarely speeds
+#' things up; it mainly overlaps network latency.
 #'
 #' @param organisms_taxIDs A character vector of NCBI Taxonomy Tax IDs to
 #'   retrieve taxonomy information for.
@@ -25,8 +35,8 @@
 #'   Defaults to `100`.
 #' @param verbose Verbosity level. One of `"silent"` (default), `"cmd"`,
 #'   `"output"`, or `"full"`.
-#' @param env_name Name of the conda environment where Entrez Direct is
-#'   installed. Defaults to `"blastr-entrez-env"`.
+#' @param env_name `r lifecycle::badge("deprecated")` No longer used:
+#'   NCBI is queried directly over HTTPS.
 #'
 #' @returns A tibble containing the taxonomic ranks for the given Tax IDs.
 #'
@@ -53,10 +63,11 @@ parallel_get_tax <- function(
   retry_times = 10L,
   batch_size = 100L,
   verbose = c("silent", "cmd", "output", "full"),
-  env_name = "blastr-entrez-env"
+  env_name = deprecated()
 ) {
   rlang::check_required(organisms_taxIDs)
   verbose <- rlang::arg_match(verbose)
+  warn_env_name_deprecated(env_name, "parallel_get_tax")
   taxids_to_run <- unique(
     stringr::str_trim(as.character(organisms_taxIDs))
   )
@@ -64,19 +75,10 @@ parallel_get_tax <- function(
     !rlang::are_na(taxids_to_run) & nzchar(taxids_to_run)
   ]
 
-  check_cmd(cmd = "efetch", env_name = env_name, verbose = verbose)
-
   run_verbose <- ifelse(
     verbose %in% c("cmd", "output", "full"),
     verbose,
     "silent"
-  )
-
-  # Standalone worker: fetches raw XML on the daemon; parsing happens in
-  # the main process (cheap relative to the network round-trip).
-  fetch_worker <- make_tax_fetch_worker(
-    env_name = env_name,
-    verbose = run_verbose
   )
 
   # A pre-existing daemon pool is adopted regardless of `total_cores`;
@@ -98,6 +100,21 @@ parallel_get_tax <- function(
     parallel_var <- TRUE
   }
 
+  # NCBI's per-second budget is shared by every worker in the pool: each
+  # daemon gets its own copy of the throttle state, so the worker is told
+  # how many peers it has and spaces its requests accordingly.
+  n_workers <- 1L
+  if (isTRUE(parallel_var)) {
+    n_workers <- max(1L, as.integer(mirai::status()$connections))
+  }
+
+  # Standalone worker: fetches raw XML on the daemon; parsing happens in
+  # the main process (cheap relative to the network round-trip).
+  fetch_worker <- make_tax_fetch_worker(
+    verbose = run_verbose,
+    rate_share = n_workers
+  )
+
   run_batches <- function(batch_list) {
     if (isTRUE(parallel_var) && isTRUE(mirai::daemons_set())) {
       map_res <- mirai::mirai_map(.x = batch_list, .f = fetch_worker)
@@ -108,20 +125,28 @@ parallel_get_tax <- function(
 
   tax_long_list <- list()
   pending_ids <- taxids_to_run
+  unknown_ids <- character(0L)
   retry_count <- 0L
 
   while (isTRUE(length(pending_ids) > 0L)) {
     batch_list <- chunk_indices(pending_ids, batch_size)
     batch_results <- run_batches(batch_list)
 
-    for (batch_res in batch_results) {
+    for (batch_i in seq_along(batch_results)) {
+      batch_res <- batch_results[[batch_i]]
       if (isTRUE(mirai::is_error_value(batch_res))) {
         next
       }
       if (isFALSE(batch_res$status == 0L)) {
         next
       }
+      if (isFALSE(tax_xml_is_valid(batch_res$stdout))) {
+        # HTTP 200 with a body that is not a TaxaSet (e.g. an HTML error
+        # page): treat as transient and retry the whole batch.
+        next
+      }
       batch_long_tbl <- parse_tax_xml(batch_res$stdout)
+      batch_found_ids <- character(0L)
       if (!rlang::is_null(batch_long_tbl)) {
         # Keep only requested IDs (merged-ID records are emitted under
         # both their old and new Tax IDs by the parser).
@@ -130,7 +155,14 @@ parallel_get_tax <- function(
           .data$query_taxID %in% taxids_to_run
         )
         tax_long_list <- c(tax_long_list, list(batch_long_tbl))
+        batch_found_ids <- unique(batch_long_tbl$query_taxID)
       }
+      # A well-formed response that omits an ID means NCBI does not know
+      # it: definitive, so it is reported once and never retried.
+      unknown_ids <- c(
+        unknown_ids,
+        setdiff(batch_list[[batch_i]], batch_found_ids)
+      )
     }
 
     retrieved_ids <- character(0L)
@@ -139,7 +171,9 @@ parallel_get_tax <- function(
         purrr::list_rbind(tax_long_list)$query_taxID
       )
     }
-    pending_ids <- taxids_to_run[!(taxids_to_run %in% retrieved_ids)]
+    pending_ids <- taxids_to_run[
+      !(taxids_to_run %in% c(retrieved_ids, unknown_ids))
+    ]
 
     if (isTRUE(length(pending_ids) > 0L)) {
       if (isTRUE(retry_count >= retry_times)) {
@@ -159,15 +193,21 @@ parallel_get_tax <- function(
     }
   }
 
-  if (
-    isTRUE(length(pending_ids) > 0L) &&
-      isFALSE(identical(verbose, "silent"))
-  ) {
-    cli::cli_inform(
-      c(
-        `!` = "The following Tax ID{?s} could not be retrieved after {retry_times} attempt{?s}: {.val {pending_ids}}." # nolint: line_length_linter
+  if (isFALSE(identical(verbose, "silent"))) {
+    if (isTRUE(length(unknown_ids) > 0L)) {
+      cli::cli_inform(
+        c(
+          `!` = "{length(unknown_ids)} Tax ID{?s} unknown to NCBI Taxonomy (not retried): {.val {unique(unknown_ids)}}." # nolint: line_length_linter
+        )
       )
-    )
+    }
+    if (isTRUE(length(pending_ids) > 0L)) {
+      cli::cli_inform(
+        c(
+          `!` = "The following Tax ID{?s} could not be retrieved after {retry_times} attempt{?s}: {.val {pending_ids}}." # nolint: line_length_linter
+        )
+      )
+    }
   }
 
   tax_long_tbl <- NULL

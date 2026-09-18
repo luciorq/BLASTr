@@ -45,7 +45,7 @@ command-line tools. Defaults to \code{"blastr-blast-env"}.}
 \value{
 Unformatted BLAST results (the raw process result, with
 \code{status}, \code{stdout}, and \code{stderr}). \code{stdout} is BLAST+ tabular
-output in format \code{"6 std qcovhsp staxid stitle"} — 15
+output in format \code{"6 std qcovhsp staxid stitle"} - 15
 tab-separated fields: the 12 standard outfmt-6 columns followed by
 \code{qcovhsp}, \code{staxid}, and \code{stitle} (subject title), with query IDs
 in the generated \verb{BLASTrQ<i>} form. (Before version 0.2.0, the

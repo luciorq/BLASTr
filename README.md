@@ -32,11 +32,12 @@ processing and automated dependency management.
   per-query exit codes and error messages are available via
   `exit_codes()`.
 - **Automated Dependency Management:** `BLASTr` automatically installs
-  and manages BLAST+ and Entrez Direct dependencies using `condathis`,
-  ensuring a hassle-free setup.
+  and manages BLAST+ using `condathis`, ensuring a hassle-free setup.
+  Taxonomy lookups and primer checks need no external tool.
 - **Taxonomic Classification:** Retrieve detailed taxonomic information
-  for your sequences using their NCBI Taxonomy IDs (batched Entrez
-  Direct requests), or search taxa by name.
+  for your sequences using their NCBI Taxonomy IDs (batched NCBI
+  E-utilities requests, no command-line tool needed), or search taxa by
+  name.
 - **Reproducible Research:** By managing dependencies in isolated Conda
   environments (with pinned versions), `BLASTr` helps ensure that your
   analyses are reproducible.
@@ -167,8 +168,8 @@ print(taxonomic_info)
 
 ## Main Functions
 
-- `install_dependencies()`: Installs BLAST+ and Entrez Direct if they
-  are not found on your system.
+- `install_dependencies()`: Installs BLAST+ if it is not found on your
+  system.
 - `make_blast_db()`: Creates a BLAST database from a FASTA file.
 - `parallel_blast()`: Runs BLAST searches for multiple sequences in
   parallel (batched).
@@ -186,27 +187,34 @@ print(taxonomic_info)
 - `parse_fasta()`: Extracts sequences from a FASTA file.
 - `get_fasta_header()`: Retrieves the full header of a sequence from a
   BLAST database.
+- `search_primers_on_fq()`: Counts reads carrying each (degenerate)
+  primer in FASTQ files, a quick library QC that runs in R.
 
 ## Dependency Management
 
-`BLASTr` uses the `condathis` package to manage its command-line
-dependencies (BLAST+, Entrez Direct, and seqkit). When you run a
-function that requires one of these tools, `BLASTr` will automatically
-check if it’s installed. If not, it will create a Conda environment and
-install the necessary software (with pinned versions for
-reproducibility). This ensures that you always have the correct versions
-of the dependencies without having to install them manually.
+`BLASTr` uses the `condathis` package to manage its only command-line
+dependency, BLAST+. NCBI Taxonomy lookups query the NCBI E-utilities
+directly over HTTPS, and primer checks on FASTQ files run in R, so
+neither needs a tool. When you run a function that requires one of these
+tools, `BLASTr` will automatically check if it’s installed. If not, it
+will create a Conda environment and install the necessary software (with
+pinned versions for reproducibility). This ensures that you always have
+the correct versions of the dependencies without having to install them
+manually.
 
 You can control the installation process with the `force` and `verbose`
 arguments in the `install_dependencies()` function (`force = TRUE` also
 serves as the upgrade path).
 
+BLAST+ is installed from the `blast` package on the [prefix.dev universe
+channel](https://prefix.dev/universe), which is built uniformly for
+Linux, macOS, and Windows, so the whole package works on all three.
+
 Advanced: the conda package specifications can be overridden per tool
-family,
-e.g. `options(blastr.conda.blast = "<channel>::<package>==<version>")`
-(similarly `blastr.conda.entrez`, `blastr.conda.seqkit`, and
-`blastr.conda.channels`), which is also the hook for testing
-platform-specific builds such as upcoming Windows packages.
+family, e.g. `options(blastr.conda.blast = "<package>==<version>")`
+(similarly `blastr.conda.blast_channels`, `blastr.conda.blast_fallback`,
+`blastr.conda.fallback_channels`, and `blastr.conda.channels`), which is
+also the hook for testing candidate BLAST+ builds.
 
 ## Contributing
 

@@ -56,55 +56,71 @@ empty_tax_long_tbl <- function() {
 
 #' Build a self-contained worker fetching taxonomy XML for Tax IDs
 #'
-#' Runs `efetch -db taxonomy -id <id1,id2,...> -format xml`.
+#' Equivalent to `efetch -db taxonomy -id <id1,id2,...> -format xml`,
+#' issued directly to the NCBI E-utilities (`efetch.fcgi`).
 #' Invalid Tax IDs are silently omitted from the response by NCBI
 #' (the request still succeeds for the valid ones).
 #' Returned as a `carrier::crate()` so the same worker serves both the
 #' serial path and `mirai` daemons.
 #'
+#' @returns `function(taxids)` giving `list(status, stdout, stderr)`:
+#'   `status` is `0L` on success, `stdout` the XML body, `stderr` the
+#'   error message (`NA` on success).
 #' @keywords internal
 #' @noRd
-make_tax_fetch_worker <- function(
-  env_name = "blastr-entrez-env",
-  verbose = "silent"
-) {
+make_tax_fetch_worker <- function(verbose = "silent", rate_share = 1L) {
   carrier::crate(
     function(taxids) {
-      fetch_res <- condathis::run(
-        "efetch",
-        "-db",
-        "taxonomy",
-        "-id",
-        paste(taxids, collapse = ","),
-        "-format",
-        "xml",
-        env_name = env_name,
-        verbose = verbose,
-        error = "continue"
+      fetch_res <- eutils_worker(
+        "efetch.fcgi",
+        list(
+          db = "taxonomy",
+          id = base::paste(taxids, collapse = ","),
+          retmode = "xml"
+        )
       )
       list(
         status = fetch_res$status,
-        stdout = fetch_res$stdout,
-        stderr = fetch_res$stderr
+        stdout = fetch_res$body,
+        stderr = fetch_res$error
       )
     },
-    env_name = env_name,
-    verbose = verbose
+    eutils_worker = make_eutils_worker(
+      verbose = verbose,
+      rate_share = rate_share
+    )
   )
+}
+
+#' Is an `efetch` taxonomy body a well-formed `TaxaSet` document?
+#'
+#' NCBI answers a batch whose IDs are all unknown with HTTP 200 and an
+#' empty `<TaxaSet/>`; unknown IDs in a mixed batch are simply omitted.
+#' A well-formed `TaxaSet` therefore means every ID it does not mention
+#' is definitively unknown (no point retrying), whereas an unparsable
+#' body (e.g. an HTML error page served with 200) is transient.
+#'
+#' @keywords internal
+#' @noRd
+tax_xml_is_valid <- function(xml_string) {
+  if (rlang::is_null(xml_string) || isFALSE(nzchar(xml_string))) {
+    return(FALSE)
+  }
+  xml_doc <- tryCatch(
+    xml2::read_xml(xml_string),
+    error = function(e) NULL
+  )
+  if (rlang::is_null(xml_doc)) {
+    return(FALSE)
+  }
+  identical(xml2::xml_name(xml_doc), "TaxaSet")
 }
 
 #' Fetch taxonomy XML from NCBI for a set of Tax IDs
 #' @keywords internal
 #' @noRd
-fetch_tax_xml <- function(
-  taxids,
-  env_name = "blastr-entrez-env",
-  verbose = "silent"
-) {
-  fetch_worker <- make_tax_fetch_worker(
-    env_name = env_name,
-    verbose = verbose
-  )
+fetch_tax_xml <- function(taxids, verbose = "silent") {
+  fetch_worker <- make_tax_fetch_worker(verbose = verbose)
   fetch_worker(taxids)
 }
 

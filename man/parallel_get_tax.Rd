@@ -11,7 +11,7 @@ parallel_get_tax(
   retry_times = 10L,
   batch_size = 100L,
   verbose = c("silent", "cmd", "output", "full"),
-  env_name = "blastr-entrez-env"
+  env_name = deprecated()
 )
 }
 \arguments{
@@ -35,25 +35,36 @@ Defaults to \code{100}.}
 \item{verbose}{Verbosity level. One of \code{"silent"} (default), \code{"cmd"},
 \code{"output"}, or \code{"full"}.}
 
-\item{env_name}{Name of the conda environment where Entrez Direct is
-installed. Defaults to \code{"blastr-entrez-env"}.}
+\item{env_name}{\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}} No longer used:
+NCBI is queried directly over HTTPS.}
 }
 \value{
 A tibble containing the taxonomic ranks for the given Tax IDs.
 }
 \description{
-Retrieves taxonomy ranks for a list of NCBI Taxonomy Tax IDs. Tax IDs
-are batched (up to 100 per \code{efetch} request) and batches are dispatched
-to \code{\link[mirai:daemons]{mirai::daemons()}} with \code{\link[mirai:mirai_map]{mirai::mirai_map()}} when \code{total_cores > 1}.
-Failed or missing Tax IDs are retried up to \code{retry_times} times.
+Retrieves taxonomy ranks for a list of NCBI Taxonomy Tax IDs from the
+NCBI E-utilities (\code{efetch}), directly over HTTPS - no command-line
+tool is required. Tax IDs are batched (up to \code{batch_size} per request)
+and batches are dispatched to \code{\link[mirai:daemons]{mirai::daemons()}} with
+\code{\link[mirai:mirai_map]{mirai::mirai_map()}} when \code{total_cores > 1}. Batches that fail
+(HTTP errors, network errors, malformed responses) are retried up to
+\code{retry_times} times; Tax IDs that NCBI reports as unknown (omitted
+from an otherwise valid response) are not retried.
 }
-\details{
-Note that NCBI enforces API rate limits (3 requests per second without
-an API key, 10 with one — set the \code{NCBI_API_KEY} environment variable,
-which Entrez Direct honors automatically). Batching keeps the request
-count low, but avoid very high \code{total_cores} values against NCBI
-servers.
+\section{NCBI etiquette}{
+
+NCBI enforces API rate limits: 3 requests per second without an API
+key, 10 with one. Set the \code{NCBI_API_KEY} environment variable to use a
+key (it is sent with every request); \code{options(blastr.ncbi.email = )}
+optionally identifies you to NCBI. Requests are throttled so that the
+whole worker pool stays within the limit (each of \code{total_cores}
+workers spaces its requests \code{total_cores} times wider), and transient
+failures (HTTP 429/5xx, network errors) are retried with backoff.
+Because each request already carries up to \code{batch_size} Tax IDs and
+the NCBI rate limit is the bottleneck, \code{total_cores > 1} rarely speeds
+things up; it mainly overlaps network latency.
 }
+
 \examples{
 \dontrun{
 # Retrieve taxonomy for multiple Tax IDs using 2 processes

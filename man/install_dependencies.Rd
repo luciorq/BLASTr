@@ -21,13 +21,14 @@ re-creation of the conda environments even if they already exist
 Default is \code{FALSE}.}
 }
 \value{
-Invisibly returns \code{TRUE} after attempting to install the
-dependencies.
+Invisibly returns \code{TRUE} once BLAST+ is installed and
+validated.
 }
 \description{
-Installs the command-line tools used by \code{BLASTr} — BLAST+, Entrez
-Direct, and seqkit — into dedicated conda environments if they are not
-already available. This ensures that all dependencies required by the
+Installs the command-line tool used by \code{BLASTr} - currently only
+BLAST+ - into a dedicated conda environment if not already available.
+(NCBI Taxonomy lookups query the NCBI E-utilities directly over HTTPS,
+and \code{\link[=search_primers_on_fq]{search_primers_on_fq()}} runs in R, so neither needs a tool.) This ensures that all dependencies required by the
 package are present with known, reproducible versions.
 }
 \section{Pinned tool versions}{
@@ -35,9 +36,9 @@ Tools are installed with pinned versions (exact upstream releases),
 so that analyses are reproducible and results can be attributed to a
 specific tool version in publications:
 \itemize{
-\item BLAST+: \code{bioconda::blast==2.16}
-\item Entrez Direct: \code{bioconda::entrez-direct==24.0}
-\item seqkit: \verb{bioconda::seqkit==2.10.1}
+\item BLAST+: \verb{blast==2.17.0} from the \url{https://prefix.dev/universe}
+channel (uniform builds for Linux, macOS and Windows); fallback
+\verb{bioconda::blast==2.17.0}
 }
 
 The update policy is:
@@ -50,23 +51,22 @@ environment already exists, it is left untouched, whatever versions
 it contains. Run \code{install_dependencies(force = TRUE)} to re-create
 the environments with the currently pinned versions (this is the
 supported upgrade path after updating \code{BLASTr} itself).
-\item Advanced users can override the specifications at runtime — without
-any package change — via options, e.g.
-\code{options(blastr.conda.blast = "<channel>::<package>==<version>")}
-(similarly \code{blastr.conda.blast_fallback}, \code{blastr.conda.entrez},
-\code{blastr.conda.seqkit}, \code{blastr.conda.channels}, and
-\code{blastr.conda.fallback_channels}). Overrides also unlock the
-corresponding tools on platforms where the default packages are not
-yet available (e.g. testing dedicated Windows builds).
+\item Advanced users can override the specifications at runtime - without
+any package change - via options, e.g.
+\code{options(blastr.conda.blast = "<package>==<version>")}
+(similarly \code{blastr.conda.blast_channels},
+\code{blastr.conda.blast_fallback}, \code{blastr.conda.fallback_channels},
+and \code{blastr.conda.channels}).
 }
 }
 
 \section{Fallback packages and platform coverage}{
-If the primary bioconda/conda-forge specification cannot be installed
-(typically because no build exists for the current platform), the
-BLAST+ family automatically falls back to the zig-toolchain builds
-(\code{blast-zig}, from the \url{https://prefix.dev/universe} channel), which
-cover all platforms including Windows.
+BLAST+ is installed from the \code{blast} package on the
+\url{https://prefix.dev/universe} channel, which is built with a single
+toolchain for Linux (x86-64 and aarch64), macOS (Intel and Apple
+silicon) and Windows, so the BLAST+ family works on every platform.
+If that package cannot be installed, the bioconda build of the same
+BLAST+ release is tried automatically (bioconda has no Windows build).
 }
 
 \section{Installation validation}{

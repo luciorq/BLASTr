@@ -1,8 +1,9 @@
 #' Retrieve Taxonomic Ranks Using NCBI Taxonomy Tax IDs
 #'
 #' Retrieves complete taxonomy information for given NCBI Taxonomy Tax IDs
-#' by querying the NCBI database using the `efetch` command. Multiple Tax
-#' IDs are fetched in a single batched request. Each record in the
+#' by querying the NCBI E-utilities (`efetch`) directly over HTTPS - no
+#' command-line tool is required. Multiple Tax IDs are fetched in a single
+#' batched request. Each record in the
 #' response is matched back to its Tax ID through the XML `<TaxId>`
 #' element, so results are correct regardless of response order.
 #'
@@ -17,8 +18,9 @@
 #'   lineage table (`FALSE`).
 #' @param verbose Verbosity level. One of `"silent"` (default), `"cmd"`,
 #'   `"output"`, or `"full"`.
-#' @param env_name Name of the conda environment where Entrez Direct is
-#'   installed. Defaults to `"blastr-entrez-env"`.
+#' @param env_name `r lifecycle::badge("deprecated")` No longer used:
+#'   NCBI is queried directly over HTTPS. See [parallel_get_tax()] for
+#'   NCBI rate limits and the `NCBI_API_KEY` environment variable.
 #'
 #' @returns A tibble containing the taxonomic ranks for the given Tax IDs.
 #'   Tax IDs that cannot be retrieved are absent from the result.
@@ -43,17 +45,15 @@ get_tax_by_taxID <- function(
   organisms_taxIDs, # nolint: object_name_linter
   parse_result = TRUE,
   verbose = c("silent", "cmd", "output", "full"),
-  env_name = "blastr-entrez-env"
+  env_name = deprecated()
 ) {
   rlang::check_required(organisms_taxIDs)
   verbose <- rlang::arg_match(verbose)
+  warn_env_name_deprecated(env_name, "get_tax_by_taxID")
   organisms_taxIDs <- stringr::str_trim(as.character(organisms_taxIDs)) # nolint: object_name_linter
-
-  check_cmd("efetch", env_name = env_name, verbose = verbose)
 
   tax_xml_res <- fetch_tax_xml(
     taxids = organisms_taxIDs,
-    env_name = env_name,
     verbose = verbose
   )
 

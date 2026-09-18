@@ -27,7 +27,7 @@
 #'
 #' @returns Unformatted BLAST results (the raw process result, with
 #'   `status`, `stdout`, and `stderr`). `stdout` is BLAST+ tabular
-#'   output in format `"6 std qcovhsp staxid stitle"` — 15
+#'   output in format `"6 std qcovhsp staxid stitle"` - 15
 #'   tab-separated fields: the 12 standard outfmt-6 columns followed by
 #'   `qcovhsp`, `staxid`, and `stitle` (subject title), with query IDs
 #'   in the generated `BLASTrQ<i>` form. (Before version 0.2.0, the

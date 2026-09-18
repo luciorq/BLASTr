@@ -2,13 +2,13 @@
 #'
 #' @description Retrieve BLAST results as a tibble for one or more query
 #'   sequences, running serially in the current process. For parallel
-#'   execution over many sequences, use [parallel_blast()] — both
+#'   execution over many sequences, use [parallel_blast()] - both
 #'   functions share the same engine and return the same format.
 #'
 #' @inheritParams run_blast
 #'
 #' @returns A `tibble` with one row per unique query sequence and the
-#'   BLAST tabular output spread into `1_`–`<num_alignments>_` prefixed
+#'   BLAST tabular output spread into `1_`-`<num_alignments>_` prefixed
 #'   column groups.
 #'
 #' @examples

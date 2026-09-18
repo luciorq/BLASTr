@@ -14,8 +14,8 @@
 #'   exit status for tool failures, or `-1` when the R-level parallel
 #'   worker itself failed (e.g. a crashed daemon). `stderr` holds the
 #'   full standard error output of the BLAST+ invocation that produced
-#'   the query's result — including non-fatal per-query warnings such
-#'   as `"Sequence contains no data"` — or `NA` when the run produced
+#'   the query's result - including non-fatal per-query warnings such
+#'   as `"Sequence contains no data"` - or `NA` when the run produced
 #'   no diagnostic output.
 #'
 #' @examples

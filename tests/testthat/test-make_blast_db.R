@@ -144,7 +144,8 @@ testthat::test_that("`make_blast_db()` with taxid_map yields staxid in results",
   # (first test ASV) hits AP011979.1 -> taxid 94172.
   testthat::expect_equal(blast_res$`1_staxid`[1], "94172")
 
-  # Round-trip: resolve the Tax IDs to taxonomy.
+  # Round-trip: resolve the Tax IDs to taxonomy (NCBI E-utilities over
+  # HTTPS; works on every platform).
   tax_res <- parallel_get_tax(
     organisms_taxIDs = unique(top_taxids),
     retry_times = 2,

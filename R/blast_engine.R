@@ -289,7 +289,7 @@ blast_engine <- function(
   )
 
   # Share the (potentially large) query vector across daemons with
-  # zero-copy shared memory when `mori` is available — but only for
+  # zero-copy shared memory when `mori` is available - but only for
   # local pools: remote daemons cannot map the host's shared memory.
   seqs_payload <- query_seqs
   if (

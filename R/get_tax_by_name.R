@@ -1,8 +1,9 @@
 #' @title Retrieve Taxonomic Ranks Using Organism Names
 #'
 #' @description Recover complete taxonomy for organism names by searching
-#'   the NCBI Taxonomy database (`esearch`) and fetching the matching
-#'   records (`efetch`). The output schema matches [get_tax_by_taxID()],
+#'   the NCBI Taxonomy database (E-utilities `esearch`) and fetching the
+#'   matching records (`efetch`), directly over HTTPS - no command-line
+#'   tool is required. The output schema matches [get_tax_by_taxID()],
 #'   with an additional `query_name` column mapping each result back to
 #'   the searched name.
 #'
@@ -13,8 +14,8 @@
 #'   lineage table (`FALSE`).
 #' @param verbose Verbosity level. One of `"silent"` (default), `"cmd"`,
 #'   `"output"`, or `"full"`.
-#' @param env_name Name of the conda environment where Entrez Direct is
-#'   installed. Defaults to `"blastr-entrez-env"`.
+#' @param env_name `r lifecycle::badge("deprecated")` No longer used:
+#'   NCBI is queried directly over HTTPS.
 #'
 #' @returns A tibble with the taxonomic ranks for the matching organisms.
 #'   Names with no match in NCBI Taxonomy are absent from the result.
@@ -31,64 +32,38 @@ get_tax_by_name <- function(
   organisms_names,
   parse_result = TRUE,
   verbose = c("silent", "cmd", "output", "full"),
-  env_name = "blastr-entrez-env"
+  env_name = deprecated()
 ) {
   rlang::check_required(organisms_names)
   verbose <- rlang::arg_match(verbose)
+  warn_env_name_deprecated(env_name, "get_tax_by_name")
   organisms_names <- stringr::str_trim(as.character(organisms_names))
 
-  check_cmd("esearch", env_name = env_name, verbose = verbose)
-
   # Step 1 (per name, unavoidable): resolve each organism name to its
-  # matching Tax IDs with `esearch | efetch -format uid` — a tiny
-  # response compared to the full XML records.
+  # matching Tax IDs with `esearch` - a tiny response compared to the
+  # full XML records.
   name_map_list <- list()
   for (organism_name in organisms_names) {
-    search_res <- condathis::run(
-      "esearch",
-      "-db",
-      "taxonomy",
-      "-query",
-      organism_name,
-      env_name = env_name,
-      verbose = verbose,
-      error = "continue"
+    search_res <- ncbi_taxonomy_search(
+      term = organism_name,
+      verbose = verbose
     )
-    if (
-      isFALSE(search_res$status == 0L) ||
-        isFALSE(stringr::str_detect(search_res$stdout, "<Count>[1-9]"))
-    ) {
+    if (isFALSE(search_res$status == 0L)) {
       if (isFALSE(identical(verbose, "silent"))) {
         cli::cli_inform(
           c(
-            `!` = "No NCBI Taxonomy match for {.val {organism_name}}."
+            `!` = "Unable to retrieve taxonomy for {.val {organism_name}}: {search_res$error}." # nolint: line_length_linter
           )
         )
       }
       next
     }
-    uid_res <- condathis::run(
-      "efetch",
-      "-format",
-      "uid",
-      stdin = "|",
-      input = search_res$stdout,
-      env_name = env_name,
-      verbose = verbose,
-      error = "continue"
-    )
-    name_taxids <- character(0L)
-    if (isTRUE(uid_res$status == 0L)) {
-      name_taxids <- stringr::str_trim(
-        strsplit(uid_res$stdout, "\n", fixed = TRUE)[[1]]
-      )
-      name_taxids <- name_taxids[nzchar(name_taxids)]
-    }
+    name_taxids <- search_res$ids
     if (isTRUE(length(name_taxids) == 0L)) {
       if (isFALSE(identical(verbose, "silent"))) {
         cli::cli_inform(
           c(
-            `!` = "Unable to retrieve taxonomy for {.val {organism_name}}."
+            `!` = "No NCBI Taxonomy match for {.val {organism_name}}."
           )
         )
       }
@@ -117,8 +92,7 @@ get_tax_by_name <- function(
   tax_long_tbl <- parallel_get_tax(
     organisms_taxIDs = unique(name_map_tbl$query_taxID),
     parse_result = FALSE,
-    verbose = verbose,
-    env_name = env_name
+    verbose = verbose
   )
 
   if (isTRUE(nrow(tax_long_tbl) == 0L)) {

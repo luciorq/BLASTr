@@ -8,7 +8,7 @@ get_tax_by_taxID(
   organisms_taxIDs,
   parse_result = TRUE,
   verbose = c("silent", "cmd", "output", "full"),
-  env_name = "blastr-entrez-env"
+  env_name = deprecated()
 )
 }
 \arguments{
@@ -22,8 +22,9 @@ lineage table (\code{FALSE}).}
 \item{verbose}{Verbosity level. One of \code{"silent"} (default), \code{"cmd"},
 \code{"output"}, or \code{"full"}.}
 
-\item{env_name}{Name of the conda environment where Entrez Direct is
-installed. Defaults to \code{"blastr-entrez-env"}.}
+\item{env_name}{\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}} No longer used:
+NCBI is queried directly over HTTPS. See \code{\link[=parallel_get_tax]{parallel_get_tax()}} for
+NCBI rate limits and the \code{NCBI_API_KEY} environment variable.}
 }
 \value{
 A tibble containing the taxonomic ranks for the given Tax IDs.
@@ -31,8 +32,9 @@ Tax IDs that cannot be retrieved are absent from the result.
 }
 \description{
 Retrieves complete taxonomy information for given NCBI Taxonomy Tax IDs
-by querying the NCBI database using the \code{efetch} command. Multiple Tax
-IDs are fetched in a single batched request. Each record in the
+by querying the NCBI E-utilities (\code{efetch}) directly over HTTPS - no
+command-line tool is required. Multiple Tax IDs are fetched in a single
+batched request. Each record in the
 response is matched back to its Tax ID through the XML \verb{<TaxId>}
 element, so results are correct regardless of response order.
 }

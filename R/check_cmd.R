@@ -1,7 +1,7 @@
 # Package-local session state (validated environment cache).
 the <- new.env(parent = emptyenv())
 
-# Pinned conda package versions — the single source of truth for the
+# Pinned conda package versions - the single source of truth for the
 # command-line tool versions BLASTr installs.
 #
 # Update policy (see also ?install_dependencies and CONTRIBUTING.md):
@@ -16,19 +16,22 @@ the <- new.env(parent = emptyenv())
 #   a package change (e.g. for testing platform-specific candidate
 #   builds).
 #
-# Fallback packages: the zig-toolchain BLAST builds (`blast-zig`, from
-# the <https://prefix.dev/universe> channel) cover all platforms,
-# including Windows, and are used automatically when the primary
-# bioconda/conda-forge specification cannot be installed.
-# TODO: @luciorq Pin `blast-zig` to an exact version once published.
+# BLAST+ is installed from the `blast` package on the
+# <https://prefix.dev/universe> channel: a single toolchain builds it
+# uniformly for linux-64, linux-aarch64, osx-64, osx-arm64 and win-64,
+# so every platform (including Windows) runs byte-identical sources of
+# the same BLAST+ release. The bioconda build of the *same* version is
+# the fallback, tried automatically when the universe package cannot be
+# installed (no Windows build exists on bioconda).
 blastr_conda_pins <- list(
-  blast = "bioconda::blast==2.16",
-  blast_fallback = "blast-zig",
-  entrez = "bioconda::entrez-direct==24.0",
-  seqkit = "bioconda::seqkit==2.10.1"
+  blast = "blast==2.17.0",
+  blast_fallback = "bioconda::blast==2.17.0"
 )
 
-blastr_fallback_channels <- c("https://prefix.dev/universe", "conda-forge")
+# Channels for the primary BLAST+ spec (universe first, conda-forge for
+# its runtime dependencies) and for the fallback.
+blastr_blast_channels <- c("https://prefix.dev/universe", "conda-forge")
+blastr_default_channels <- c("conda-forge", "bioconda")
 
 #' Conda Package Specification for a Command-Line Tool
 #'
@@ -42,12 +45,11 @@ blastr_fallback_channels <- c("https://prefix.dev/universe", "conda-forge")
 #' testing platform-specific candidate packages before they become the
 #' default):
 #'
-#' * `options(blastr.conda.blast = "<channel>::<package>==<version>")`
+#' * `options(blastr.conda.blast = "<package>==<version>")`
+#' * `options(blastr.conda.blast_channels = c("<url-or-name>", ...))`
 #' * `options(blastr.conda.blast_fallback = "<channel>::<package>==<version>")`
-#' * `options(blastr.conda.entrez = "<channel>::<package>==<version>")`
-#' * `options(blastr.conda.seqkit = "<channel>::<package>==<version>")`
-#' * `options(blastr.conda.channels = c("conda-forge", "bioconda"))`
 #' * `options(blastr.conda.fallback_channels = c("<url-or-name>", ...))`
+#' * `options(blastr.conda.channels = c("conda-forge", "bioconda"))`
 #'
 #' @param cmd Character string with the command-line tool name.
 #'
@@ -60,15 +62,19 @@ conda_pkg_spec <- function(cmd) {
   sys_arch <- get_sys_arch()
   channels <- getOption(
     "blastr.conda.channels",
-    default = c("conda-forge", "bioconda")
+    default = blastr_default_channels
+  )
+  blast_channels <- getOption(
+    "blastr.conda.blast_channels",
+    default = blastr_blast_channels
   )
   fallback_channels <- getOption(
     "blastr.conda.fallback_channels",
-    default = blastr_fallback_channels
+    default = blastr_default_channels
   )
 
   if (stringr::str_detect(cmd, "^(t?)blast|makeblastdb|blastdbcmd")) {
-    # The `blast-zig` fallback covers every platform, so the BLAST+
+    # The universe `blast` package covers every platform, so the BLAST+
     # family is supported everywhere (including Windows).
     return(
       list(
@@ -76,7 +82,7 @@ conda_pkg_spec <- function(cmd) {
           "blastr.conda.blast",
           default = blastr_conda_pins$blast
         ),
-        channels = channels,
+        channels = blast_channels,
         fallback = list(
           packages = getOption(
             "blastr.conda.blast_fallback",
@@ -87,71 +93,39 @@ conda_pkg_spec <- function(cmd) {
       )
     )
   }
-  if (stringr::str_detect(cmd, "^(efetch|esearch|esummary|elink|xtract)$")) {
-    return(
-      windows_guarded_spec(
-        option_name = "blastr.conda.entrez",
-        default_packages = blastr_conda_pins$entrez,
-        channels = channels,
-        tool_label = "Entrez Direct",
-        sys_arch = sys_arch
-      )
-    )
-  }
-  if (stringr::str_detect(cmd, "^seqkit$")) {
-    return(
-      windows_guarded_spec(
-        option_name = "blastr.conda.seqkit",
-        default_packages = blastr_conda_pins$seqkit,
-        channels = channels,
-        tool_label = "seqkit",
-        sys_arch = sys_arch
-      )
-    )
-  }
   cli::cli_abort(
     message = c(
       `x` = "Unsupported command: {.val {cmd}}.",
-      `i` = "Supported commands: BLAST+ tools ({.code blastn}, {.code blastp}, {.code blastx}, {.code tblastn}, {.code tblastx}, {.code makeblastdb}, {.code blastdbcmd}), Entrez Direct tools ({.code efetch}, {.code esearch}, {.code esummary}, {.code elink}, {.code xtract}), and {.code seqkit}." # nolint: line_length_linter
+      `i` = "Supported commands: BLAST+ tools ({.code blastn}, {.code blastp}, {.code blastx}, {.code tblastn}, {.code tblastx}, {.code makeblastdb}, {.code blastdbcmd})." # nolint: line_length_linter
     ),
     class = "blastr_check_cmd_unsupported_cmd"
   )
 }
 
-#' Specification for tool families without a Windows build yet
+#' Is a command-line tool installable on the current platform?
+#'
+#' `TRUE` when a conda specification exists for `cmd` on this platform
+#' (by default or via the `blastr.conda.*` options), `FALSE` when the
+#' tool family raises `blastr_unsupported_os_error` on this platform.
+#' Every supported tool (the BLAST+ family) is currently available on
+#' all platforms. Unsupported command names still raise an error.
+#'
 #' @keywords internal
 #' @noRd
-windows_guarded_spec <- function(
-  option_name,
-  default_packages,
-  channels,
-  tool_label,
-  sys_arch
-) {
-  packages <- getOption(option_name, default = NULL)
-  if (rlang::is_null(packages)) {
-    if (isTRUE(stringr::str_detect(sys_arch, "^Windows"))) {
-      cli::cli_abort(
-        message = c(
-          `x` = "{tool_label} conda packages are not yet available for Windows by default.", # nolint: line_length_linter
-          `i` = "Windows support is planned through dedicated conda packages.", # nolint: line_length_linter
-          `i` = "To test a candidate package, set {.code options({option_name} = \"<channel>::<package>==<version>\")}." # nolint: line_length_linter
-        ),
-        class = "blastr_unsupported_os_error"
-      )
-    }
-    packages <- default_packages
-  }
-  list(packages = packages, channels = channels, fallback = NULL)
+cmd_available_on_platform <- function(cmd) {
+  tryCatch(
+    {
+      conda_pkg_spec(cmd)
+      TRUE
+    },
+    blastr_unsupported_os_error = function(e) FALSE
+  )
 }
 
 #' Version-probe arguments used to validate an installed command
 #' @keywords internal
 #' @noRd
 cmd_version_args <- function(cmd) {
-  if (identical(cmd, "seqkit")) {
-    return("version")
-  }
   "-version"
 }
 
@@ -254,7 +228,7 @@ install_env_spec <- function(pkg_spec, env_name, verbose, overwrite = FALSE) {
 
 #' Determine if a Command is Available and Install if Necessary
 #'
-#' Checks if a specified command-line tool (e.g. 'blastn' or 'efetch') is
+#' Checks if a specified command-line tool (e.g. 'blastn') is
 #'   available in the managed conda environment.
 #'   If not, it creates a conda environment and installs the required
 #'   tool, falling back to alternative package sources when the primary
@@ -264,8 +238,7 @@ install_env_spec <- function(pkg_spec, env_name, verbose, overwrite = FALSE) {
 #'   a stale or corrupted environment is rebuilt once automatically.
 #'
 #' @param cmd Character string specifying the command-line tool to check for.
-#'   Supported commands are the BLAST+ tools, the Entrez Direct tools,
-#'   and `seqkit`. Default is `"blastn"`.
+#'   Supported commands are the BLAST+ tools. Default is `"blastn"`.
 #' @param env_name Name of the conda environment to create or use.
 #'   Defaults to `"blastr-blast-env"`.
 #' @param verbose Verbosity level during environment creation. One of
@@ -282,8 +255,6 @@ install_env_spec <- function(pkg_spec, env_name, verbose, overwrite = FALSE) {
 #' # Check if 'blastn' command is available, and install it if not
 #' check_cmd("blastn", env_name = "blastr-blast-env")
 #'
-#' # Check if 'efetch' command is available, and install it if not
-#' check_cmd("efetch", env_name = "blastr-entrez-env")
 #'
 #' # Force re-creation of the conda environment and re-install 'blastn'
 #' check_cmd("blastn", env_name = "blastr-blast-env", force = TRUE)

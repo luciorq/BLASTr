@@ -68,18 +68,23 @@ By contributing to this project you agree to abide by its terms.
 
 ## Pinned command-line tool versions
 
-`BLASTr` installs its command-line dependencies (BLAST+, Entrez Direct,
-seqkit) into conda environments with **pinned versions**. The pins live
+`BLASTr` installs its only command-line dependency, BLAST+, into a
+conda environment with a **pinned version**. (NCBI Taxonomy is queried
+over HTTPS via the E-utilities client in `R/eutils.R` - the test suite
+validates it against the real Entrez Direct tools, see
+`tests/testthat/test-eutils-vs-edirect.R` - and `search_primers_on_fq()`
+runs in R.) The pins live
 in a single place: `blastr_conda_pins` in `R/check_cmd.R`.
 
 Maintainer policy for updating a pin:
 
-1. Pins reference exact upstream releases (e.g. `bioconda::blast==2.16`)
-   and are bumped **only in a minor release** (`0.x.0`), never in a
-   patch release.
-2. Before bumping, confirm the new version is available on bioconda for
-   every supported platform (linux-64, osx-64/osx-arm64, and — once the
-   dedicated packages exist — Windows).
+1. Pins reference exact upstream releases (e.g. `blast==2.17.0`) and
+   are bumped **only in a minor release** (`0.x.0`), never in a patch
+   release.
+2. Before bumping, confirm the new version is available for every
+   supported platform: BLAST+ on <https://prefix.dev/universe>
+   (linux-64, linux-aarch64, osx-64, osx-arm64, win-64) **and** on
+   bioconda (the fallback must pin the same release).
 3. Bump the value in `blastr_conda_pins`, then run the full test suite
    locally with fresh environments (`install_dependencies(force = TRUE)`
    first, or rely on the hermetic test setup, which builds environments
@@ -91,8 +96,8 @@ Maintainer policy for updating a pin:
    `install_dependencies(force = TRUE)` is the documented upgrade path.
 
 At runtime, users can override any spec without a package change via
-`options(blastr.conda.blast = ...)` / `blastr.conda.entrez` /
-`blastr.conda.seqkit` / `blastr.conda.channels` — useful for testing
+`options(blastr.conda.blast = ...)` / `blastr.conda.blast_channels` /
+`blastr.conda.channels` - useful for testing
 candidate builds (e.g. platform-specific packages) before they become
 the pinned default.
 
@@ -100,9 +105,10 @@ the pinned default.
 
 Tool families may declare a *fallback* conda specification in
 `blastr_conda_pins` / `conda_pkg_spec()` (`R/check_cmd.R`), tried
-automatically when the primary bioconda/conda-forge spec cannot be
-installed on the current platform. The BLAST+ family falls back to the
-zig-toolchain `blast-zig` builds from <https://prefix.dev/universe>,
-which cover all platforms including Windows. Fallback pins follow the
-same update policy as primary pins (pin exact versions once published;
-bump only in minor releases; record in NEWS).
+automatically when the primary spec cannot be installed on the current
+platform. The BLAST+ family is installed primarily from the `blast`
+package on <https://prefix.dev/universe> (one toolchain, all platforms
+including Windows; owner-maintained) and falls back to the bioconda
+build of the **same** release, so results never depend on which source
+was installed. Fallback pins follow the same update policy as primary
+pins (bump both together, only in minor releases; record in NEWS).

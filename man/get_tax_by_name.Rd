@@ -8,7 +8,7 @@ get_tax_by_name(
   organisms_names,
   parse_result = TRUE,
   verbose = c("silent", "cmd", "output", "full"),
-  env_name = "blastr-entrez-env"
+  env_name = deprecated()
 )
 }
 \arguments{
@@ -22,8 +22,8 @@ lineage table (\code{FALSE}).}
 \item{verbose}{Verbosity level. One of \code{"silent"} (default), \code{"cmd"},
 \code{"output"}, or \code{"full"}.}
 
-\item{env_name}{Name of the conda environment where Entrez Direct is
-installed. Defaults to \code{"blastr-entrez-env"}.}
+\item{env_name}{\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}} No longer used:
+NCBI is queried directly over HTTPS.}
 }
 \value{
 A tibble with the taxonomic ranks for the matching organisms.
@@ -31,8 +31,9 @@ Names with no match in NCBI Taxonomy are absent from the result.
 }
 \description{
 Recover complete taxonomy for organism names by searching
-the NCBI Taxonomy database (\code{esearch}) and fetching the matching
-records (\code{efetch}). The output schema matches \code{\link[=get_tax_by_taxID]{get_tax_by_taxID()}},
+the NCBI Taxonomy database (E-utilities \code{esearch}) and fetching the
+matching records (\code{efetch}), directly over HTTPS - no command-line
+tool is required. The output schema matches \code{\link[=get_tax_by_taxID]{get_tax_by_taxID()}},
 with an additional \code{query_name} column mapping each result back to
 the searched name.
 }

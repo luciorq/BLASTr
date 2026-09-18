@@ -21,8 +21,26 @@ Development Changelog: [dev](https://github.com/heronoh/BLASTr/compare/v0.1.7...
   warnings inside successful batches (e.g. empty records) are captured
   in `exit_codes()` output.
 
+* Taxonomy lookups no longer depend on Entrez Direct. `get_tax_by_taxID()`,
+  `get_tax_by_name()`, and `parallel_get_tax()` now query the NCBI
+  E-utilities (`efetch.fcgi` / `esearch.fcgi`) directly over HTTPS with
+  a small internal client (`curl` + `xml2`): no conda environment, no
+  Perl, and taxonomy works on Windows. The client sends `tool` (and an
+  optional `options(blastr.ncbi.email = )`), honors `NCBI_API_KEY`,
+  throttles to the NCBI per-second limits (shared across the whole
+  worker pool when `total_cores > 1`), and retries HTTP 429/5xx and
+  network errors with backoff. Tax IDs unknown to NCBI are reported
+  once and no longer retried (`parallel_get_tax()` on one unknown ID
+  took ~40 s before; it now takes one request). The `env_name` argument of the three
+  functions is deprecated and ignored. The test suite validates the
+  client against the real Entrez Direct tools
+  (`test-eutils-vs-edirect.R`), so results are byte-for-byte the same
+  XML NCBI serves to `efetch`. As a consequence the package no longer
+  needs the development version of `condathis`: the CRAN release
+  (`>= 0.1.4`) is sufficient.
+
 * `get_tax_by_name()` was rewritten and now works: it searches NCBI
-  Taxonomy with `esearch` and fetches matching records with `efetch`,
+  Taxonomy (`esearch`) and fetches the matching records (`efetch`),
   returning the same schema as `get_tax_by_taxID()` plus a `query_name`
   column.
 
@@ -34,43 +52,60 @@ Development Changelog: [dev](https://github.com/heronoh/BLASTr/compare/v0.1.7...
 
 * `parallel_get_tax()` now batches Tax IDs (up to `batch_size` per
   `efetch` request, default 100), dramatically reducing the number of
-  NCBI requests, and documents NCBI rate limits (`NCBI_API_KEY` is
-  honored by Entrez Direct automatically).
+  NCBI requests, and documents NCBI rate limits (`NCBI_API_KEY` is sent
+  with every request when set).
 
 * `make_blast_db()` validates its input files and gained clearer errors;
   `db_path` may be omitted to create the database alongside the input
   FASTA.
 
-* New exported `search_primers_on_fq()`: counts (degenerate IUPAC)
-  primer occurrences in plain or gzipped FASTQ files using `seqkit`
-  (installed automatically in a conda environment). Replaces a
+* New exported `search_primers_on_fq()`: counts, per FASTQ file and
+  primer, how many reads carry the (IUPAC degenerate) primer, with the
+  percentage of the library - a quick amplicon QC. The implementation
+  is pure R (no external tool): files are streamed in chunks
+  (`chunk_size` reads at a time, plain or gzip-compressed), primers are
+  expanded into regular expressions (reported in the `parsed_primer`
+  column), matching is case-insensitive, and both strands are searched
+  by default (`only_positive_strand = FALSE`). It replaces a
   non-portable internal prototype that shelled out to `grep`/`zgrep`
-  and miscounted reads whose quality line starts with `@`. Both strands
-  are searched by default (`only_positive_strand = FALSE`).
+  and miscounted reads whose quality line starts with `@`; malformed
+  FASTQ records now raise a classed error (`blastr_fastq_malformed`).
+  A small synthetic library (`inst/extdata/toy_reads.fastq.gz`) ships
+  with the package for runnable examples and the vignette.
 
 * The conda package specifications used to install command-line tools
   can now be overridden via options (`blastr.conda.blast`,
-  `blastr.conda.entrez`, `blastr.conda.seqkit`,
-  `blastr.conda.channels`), which also unlocks the corresponding tools
-  on Windows for testing platform-specific candidate packages.
+  `blastr.conda.blast_channels`, `blastr.conda.blast_fallback`,
+  `blastr.conda.fallback_channels`, `blastr.conda.channels`), useful
+  for testing candidate BLAST+ builds.
 
 * The version-pin update policy for the bundled command-line tools is
   now defined and documented (see `?install_dependencies` and
   `CONTRIBUTING.md`): pins are exact upstream releases (currently
-  BLAST+ 2.16, Entrez Direct 24.0, seqkit 2.10.1) kept in a single
+  BLAST+ 2.17.0, the package's only external tool) kept in a single
   source of truth, bumped only in minor releases with a NEWS record,
-  and never upgraded implicitly — `install_dependencies(force = TRUE)`
-  is the supported upgrade path. `install_dependencies()` now also
-  provisions the seqkit environment.
+  and never upgraded implicitly - `install_dependencies(force = TRUE)`
+  is the supported upgrade path.
+
+* BLAST+ is now installed from the `blast` package on the
+  `https://prefix.dev/universe` channel, built with a single toolchain
+  for linux-64, linux-aarch64, osx-64, osx-arm64 and win-64. This
+  upgrades the pinned BLAST+ release from 2.16 to 2.17.0 and makes the
+  BLAST+ family (`parallel_blast()`, `make_blast_db()`,
+  `get_fasta_header()`, ...) available on Windows, which is now part of
+  the CI matrix. With taxonomy over HTTPS and primer search in R,
+  BLAST+ is the only external tool, so the whole package now works on
+  Linux, macOS and Windows.
+  Existing environments are not upgraded implicitly; run
+  `install_dependencies(force = TRUE)` to move to 2.17.0.
 
 * Environment installation is hardened and now supports fallback
-  package sources: when the primary bioconda/conda-forge specification
-  cannot be installed (e.g. no build for the current platform), the
-  BLAST+ family automatically falls back to the zig-toolchain
-  `blast-zig` builds from the `https://prefix.dev/universe` channel,
-  which cover all platforms including Windows. Fallbacks are
-  overridable via `blastr.conda.blast_fallback` /
-  `blastr.conda.fallback_channels` options.
+  package sources: when the primary specification cannot be installed,
+  the BLAST+ family automatically falls back to the bioconda build of
+  the same BLAST+ release. Primary channels and fallbacks are
+  overridable via the `blastr.conda.blast_channels`,
+  `blastr.conda.blast_fallback` and `blastr.conda.fallback_channels`
+  options.
 
 * Installed tools are now validated (version probe) after environment
   creation and once per session for existing environments; a stale or
@@ -96,7 +131,7 @@ Development Changelog: [dev](https://github.com/heronoh/BLASTr/compare/v0.1.7...
   concatenated on one line) was fixed, and a matching taxid map
   (`inst/extdata/minimal_db_blast.txt`, one `<SequenceId> <TaxonomyId>`
   pair per line) is now shipped, so the packaged example exercises the
-  full pipeline — database build with `-taxid_map`, BLAST hits with real
+  full pipeline - database build with `-taxid_map`, BLAST hits with real
   `staxid` values, and taxonomy retrieval.
 
 ### Fixed
@@ -110,8 +145,8 @@ Development Changelog: [dev](https://github.com/heronoh/BLASTr/compare/v0.1.7...
     `1_staxid`, ...) even when no query has hits, restoring the 0.1.7
     column guarantee.
   * `get_blast_results()` again fails loudly (classed error
-    `blastr_run_blast_error`) when every query fails — e.g. a mistyped
-    `db_path` — instead of returning a hits-free tibble
+    `blastr_run_blast_error`) when every query fails - e.g. a mistyped
+    `db_path` - instead of returning a hits-free tibble
     indistinguishable from "no hits".
   * A pre-existing `mirai::daemons()` pool is now adopted even at the
     default `total_cores = 1` (previously everything silently ran
@@ -123,16 +158,15 @@ Development Changelog: [dev](https://github.com/heronoh/BLASTr/compare/v0.1.7...
   * `exit_codes()` reports R-level worker failures with the documented
     sentinel `-1` (previously `NA`, which NA-unsafe QC filters silently
     passed), and `stderr` again carries the full BLAST diagnostic
-    output — including untagged warnings such as "Examining 5 or more
-    matches is recommended" — for every query in a batch. Stale stderr
+    output - including untagged warnings such as "Examining 5 or more
+    matches is recommended" - for every query in a batch. Stale stderr
     from failed attempts is overwritten when a retry succeeds.
   * `mori::share()` is only used for local daemon pools: remote workers
     cannot map the host's shared memory (every chunk would fail).
   * `search_primers_on_fq()` searches every primer even when names are
     duplicated (previously later same-named primers were silently
     skipped; duplicates are now renamed via `make.unique()` with a
-    warning), and counts matches with `seqkit grep --count` instead of
-    writing matched reads to a temporary file and re-reading them.
+    warning).
   * `get_fasta_header()` returns titles aligned to (and named by) the
     requested IDs instead of relying on database output order.
   * `get_tax_by_name()` resolves names to Tax IDs with lightweight
@@ -162,8 +196,8 @@ Development Changelog: [dev](https://github.com/heronoh/BLASTr/compare/v0.1.7...
 * `parallel_blast_old()` (deprecated since 0.1.7, and broken by the
   0.1.7 argument rename) has been removed. Use `parallel_blast()`,
   which returns the same output format. Note the error-handling
-  difference: failed queries no longer raise an error — they are
-  recorded in `exit_codes()` — and empty input raises a classed error.
+  difference: failed queries no longer raise an error - they are
+  recorded in `exit_codes()` - and empty input raises a classed error.
 
 * `parse_fasta()` no longer requires R >= 4.5 and its error message now
   shows the actual file path.

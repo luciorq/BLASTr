@@ -13,7 +13,7 @@
 ## Notes for CRAN reviewers
 
 - All tests and examples that require external command-line tools
-  (BLAST+, Entrez Direct, seqkit — installed on demand into conda
+  (BLAST+, installed on demand into a conda
   environments via the `condathis` package) or network access are
   skipped on CRAN (`skip_on_cran()` / `\dontrun{}`).
 - No software is downloaded or installed without an explicit user

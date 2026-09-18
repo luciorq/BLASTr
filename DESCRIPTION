@@ -20,7 +20,8 @@ Depends:
 Imports:
     carrier (>= 0.2.0),
     cli,
-    condathis (>= 0.2.0),
+    condathis (>= 0.1.4),
+    curl,
     dplyr (>= 1.1.0),
     fs,
     lifecycle,
@@ -33,22 +34,20 @@ Imports:
     tibble,
     tidyr,
     tools,
+    utils,
     withr,
     xml2
 Suggests:
-    curl,
     knitr,
     mori,
     quarto,
     testthat (>= 3.0.0)
 VignetteBuilder:
     quarto
-Remotes:
-    luciorq/condathis
 Config/Needs/website: quarto
+Config/roxygen2/version: 8.1.0
 Config/testthat/edition: 3
 Config/testthat/parallel: false
 Encoding: UTF-8
 Language: en-US
 Roxygen: list(markdown = TRUE)
-Config/roxygen2/version: 8.1.0
