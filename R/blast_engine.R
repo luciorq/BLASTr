@@ -131,7 +131,14 @@ make_blast_worker <- function(
         ),
         action = "replace"
       )
-      blast_res <- condathis::run_bin(
+      # `micromamba run` on Windows (env binaries live under Library/bin),
+      # direct binary elsewhere (no per-chunk activation overhead).
+      run_fn <- if (isTRUE(via_micromamba)) {
+        condathis::run
+      } else {
+        condathis::run_bin
+      }
+      blast_res <- run_fn(
         blast_type,
         "-db",
         db_path,
@@ -172,7 +179,8 @@ make_blast_worker <- function(
     mt_mode = mt_mode,
     outfmt = outfmt,
     verbose = verbose,
-    env_name = env_name
+    env_name = env_name,
+    via_micromamba = use_micromamba_run()
   )
 }
 

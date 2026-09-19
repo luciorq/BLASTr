@@ -51,7 +51,7 @@ get_fasta_header <- function(
   # Fetch accession alongside title so results can be aligned to the
   # requested IDs: blastdbcmd outputs entries in database order, and a
   # bare title stream can misalign when titles are empty.
-  blastdbcmd_res <- condathis::run_bin(
+  blastdbcmd_res <- run_env_cmd(
     "blastdbcmd",
     "-db",
     db_path,
@@ -60,7 +60,8 @@ get_fasta_header <- function(
     "-outfmt",
     "%a\t%t",
     env_name = env_name,
-    verbose = verbose
+    verbose = verbose,
+    error = "cancel"
   )
 
   header_lines <- strsplit(

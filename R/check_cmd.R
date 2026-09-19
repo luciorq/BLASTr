@@ -122,6 +122,54 @@ cmd_available_on_platform <- function(cmd) {
   )
 }
 
+#' Launch tools through `micromamba run` instead of the env binary?
+#'
+#' `condathis::run_bin()` (CRAN release) resolves `<env>/bin/<cmd>`, which
+#' does not exist on Windows (conda installs executables under
+#' `<env>/Library/bin/<cmd>.exe`), whereas `condathis::run()` activates
+#' the environment through `micromamba run` and finds them on every
+#' platform at the cost of a little process overhead per call. Defaults
+#' to `TRUE` on Windows; `options(blastr.use_micromamba_run = )` overrides
+#' (used by the test suite to exercise the Windows path on Linux).
+#'
+#' @keywords internal
+#' @noRd
+use_micromamba_run <- function() {
+  isTRUE(getOption(
+    "blastr.use_micromamba_run",
+    default = stringr::str_detect(get_sys_arch(), "^Windows")
+  ))
+}
+
+#' Run a tool from a managed environment (platform-appropriate launcher)
+#' @keywords internal
+#' @noRd
+run_env_cmd <- function(
+  cmd,
+  ...,
+  env_name,
+  verbose = "silent",
+  error = "continue",
+  via_micromamba = use_micromamba_run()
+) {
+  if (isTRUE(via_micromamba)) {
+    return(condathis::run(
+      cmd,
+      ...,
+      env_name = env_name,
+      verbose = verbose,
+      error = error
+    ))
+  }
+  condathis::run_bin(
+    cmd,
+    ...,
+    env_name = env_name,
+    verbose = verbose,
+    error = error
+  )
+}
+
 #' Version-probe arguments used to validate an installed command
 #' @keywords internal
 #' @noRd
@@ -132,13 +180,15 @@ cmd_version_args <- function(cmd) {
 #' Validate that a command runs inside its conda environment
 #'
 #' Executes the tool's version probe (verified to exit 0 for every
-#' supported tool) and returns `TRUE` only on a zero exit status.
+#' supported tool). Returns a list with `ok` (`TRUE` only on a zero exit
+#' status), `status`, and `stderr` so callers can report why a probe
+#' failed.
 #'
 #' @keywords internal
 #' @noRd
 validate_cmd <- function(cmd, env_name) {
   probe_res <- tryCatch(
-    condathis::run_bin(
+    run_env_cmd(
       cmd,
       cmd_version_args(cmd),
       env_name = env_name,
@@ -149,7 +199,11 @@ validate_cmd <- function(cmd, env_name) {
       list(status = 127L, stderr = conditionMessage(e))
     }
   )
-  isTRUE(probe_res$status == 0L)
+  list(
+    ok = isTRUE(probe_res$status == 0L),
+    status = probe_res$status,
+    stderr = probe_res$stderr
+  )
 }
 
 #' Create a conda environment from a specification, with fallback
@@ -285,7 +339,8 @@ check_cmd <- function(
     )
   }
 
-  if (isFALSE(validate_cmd(cmd, env_name))) {
+  probe <- validate_cmd(cmd, env_name)
+  if (isFALSE(probe$ok)) {
     # Stale or corrupted environment (e.g. interrupted installation,
     # moved cache directory): rebuild once and re-validate.
     if (isFALSE(identical(verbose, "silent"))) {
@@ -301,11 +356,18 @@ check_cmd <- function(
       verbose = verbose,
       overwrite = TRUE
     )
-    if (isFALSE(validate_cmd(cmd, env_name))) {
+    probe <- validate_cmd(cmd, env_name)
+    if (isFALSE(probe$ok)) {
+      probe_stderr <- stringr::str_trim(paste(probe$stderr, collapse = "\n"))
       cli::cli_abort(
         message = c(
-          `x` = "Command {.code {cmd}} is not functional in environment {.val {env_name}} even after rebuilding.", # nolint: line_length_linter
-          `i` = "Inspect the environment with: {.code condathis::run_bin(\"{cmd}\", \"{cmd_version_args(cmd)}\", env_name = \"{env_name}\", verbose = \"full\")}" # nolint: line_length_linter
+          `x` = "Command {.code {cmd}} is not functional in environment {.val {env_name}} even after rebuilding (exit status {.val {probe$status}}).", # nolint: line_length_linter
+          `!` = if (nzchar(probe_stderr)) {
+            "Probe output: {probe_stderr}"
+          } else {
+            "Probe produced no output."
+          }, # nolint: line_length_linter
+          `i` = "Inspect the environment with: {.code condathis::run(\"{cmd}\", \"{cmd_version_args(cmd)}\", env_name = \"{env_name}\", verbose = \"full\")}" # nolint: line_length_linter
         ),
         class = "blastr_env_validation_error"
       )
