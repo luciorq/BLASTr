@@ -1,0 +1,6 @@
+# BLASTr
+
+``` r
+
+library(BLASTr)
+```
