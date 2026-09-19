@@ -110,7 +110,8 @@ make_blast_worker <- function(
   mt_mode,
   verbose,
   env_name,
-  outfmt = blast_outfmt_string
+  outfmt = blast_outfmt_string,
+  via_micromamba = use_micromamba_run()
 ) {
   carrier::crate(
     function(idx) {
@@ -180,7 +181,7 @@ make_blast_worker <- function(
     outfmt = outfmt,
     verbose = verbose,
     env_name = env_name,
-    via_micromamba = use_micromamba_run()
+    via_micromamba = via_micromamba
   )
 }
 

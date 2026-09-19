@@ -101,27 +101,47 @@ testthat::test_that("run_env_cmd works through both launchers", {
   testthat::skip_on_cran()
   testthat::skip_if_offline()
 
-  # Direct binary (Linux/macOS default) and `micromamba run` (Windows
-  # default, exercised here on every platform) must agree.
-  res_bin <- run_env_cmd(
-    "blastn",
-    "-version",
-    env_name = "blastr-blast-env",
-    via_micromamba = FALSE
-  )
+  first_line <- function(x) {
+    stringr::str_trim(strsplit(x, "\r?\n")[[1]][[1]])
+  }
+
+  # `micromamba run` launcher (Windows default) must work everywhere.
   res_run <- run_env_cmd(
     "blastn",
     "-version",
     env_name = "blastr-blast-env",
     via_micromamba = TRUE
   )
-  testthat::expect_equal(res_bin$status, 0L)
   testthat::expect_equal(res_run$status, 0L)
   testthat::expect_true(stringr::str_detect(res_run$stdout, "blastn: 2\\.17"))
-  testthat::expect_equal(
-    stringr::str_trim(res_run$stdout),
-    stringr::str_trim(res_bin$stdout)
+
+  # Platform default launcher must work too.
+  res_default <- run_env_cmd(
+    "blastn",
+    "-version",
+    env_name = "blastr-blast-env"
   )
+  testthat::expect_equal(res_default$status, 0L)
+  testthat::expect_equal(
+    first_line(res_default$stdout),
+    first_line(res_run$stdout)
+  )
+
+  # Direct binary: only where CRAN condathis resolves `<env>/bin/<cmd>`
+  # (not on Windows, where executables live under Library/bin).
+  if (isFALSE(stringr::str_detect(get_sys_arch(), "^Windows"))) {
+    res_bin <- run_env_cmd(
+      "blastn",
+      "-version",
+      env_name = "blastr-blast-env",
+      via_micromamba = FALSE
+    )
+    testthat::expect_equal(res_bin$status, 0L)
+    testthat::expect_equal(
+      first_line(res_bin$stdout),
+      first_line(res_run$stdout)
+    )
+  }
 
   probe <- validate_cmd("blastn", "blastr-blast-env")
   testthat::expect_true(probe$ok)

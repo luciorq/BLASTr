@@ -50,7 +50,9 @@ get_fasta_header <- function(
 
   # Fetch accession alongside title so results can be aligned to the
   # requested IDs: blastdbcmd outputs entries in database order, and a
-  # bare title stream can misalign when titles are empty.
+  # bare title stream can misalign when titles are empty. The separator
+  # is a space (accessions never contain one): a tab in the format string
+  # does not survive `micromamba run` on Windows.
   blastdbcmd_res <- run_env_cmd(
     "blastdbcmd",
     "-db",
@@ -58,7 +60,7 @@ get_fasta_header <- function(
     "-entry",
     paste(id, collapse = ","),
     "-outfmt",
-    "%a\t%t",
+    "%a %t",
     env_name = env_name,
     verbose = verbose,
     error = "cancel"
@@ -66,13 +68,12 @@ get_fasta_header <- function(
 
   header_lines <- strsplit(
     stringr::str_trim(blastdbcmd_res$stdout),
-    "\n",
-    fixed = TRUE
+    "\r?\n"
   )[[1]]
-  accession_vec <- stringr::str_remove(header_lines, "\t.*$")
+  accession_vec <- stringr::str_remove(header_lines, " .*$")
   title_vec <- rlang::set_names(
     stringr::str_trim(
-      stringr::str_remove(header_lines, "^[^\t]*\t?")
+      stringr::str_remove(header_lines, "^[^ ]* ?")
     ),
     accession_vec
   )
