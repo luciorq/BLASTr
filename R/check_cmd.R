@@ -122,26 +122,41 @@ cmd_available_on_platform <- function(cmd) {
   )
 }
 
-#' Launch tools through `micromamba run` instead of the env binary?
+#' Directories holding a conda environment's executables
 #'
-#' `condathis::run_bin()` (CRAN release) resolves `<env>/bin/<cmd>`, which
-#' does not exist on Windows (conda installs executables under
-#' `<env>/Library/bin/<cmd>.exe`), whereas `condathis::run()` activates
-#' the environment through `micromamba run` and finds them on every
-#' platform at the cost of a little process overhead per call. Defaults
-#' to `TRUE` on Windows; `options(blastr.use_micromamba_run = )` overrides
-#' (used by the test suite to exercise the Windows path on Linux).
+#' On Linux/macOS conda installs executables under `<env>/bin`. On
+#' Windows they live under `<env>/Library/bin` (plus a few sibling
+#' directories), which the CRAN release of `condathis::run_bin()` does
+#' not search. Mirrors the search order of newer condathis versions.
 #'
 #' @keywords internal
 #' @noRd
-use_micromamba_run <- function() {
-  isTRUE(getOption(
-    "blastr.use_micromamba_run",
-    default = stringr::str_detect(get_sys_arch(), "^Windows")
-  ))
+env_bin_search_dirs <- function(env_dir) {
+  if (isFALSE(stringr::str_detect(get_sys_arch(), "^Windows"))) {
+    return(fs::path(env_dir, "bin"))
+  }
+  fs::path(
+    env_dir,
+    c(
+      "",
+      "Library/mingw-w64/bin",
+      "Library/usr/bin",
+      "Library/bin",
+      "Scripts",
+      "bin"
+    )
+  )
 }
 
-#' Run a tool from a managed environment (platform-appropriate launcher)
+#' Run a tool binary from a managed environment on any platform
+#'
+#' Prepends the environment's executable directories to `PATH` and then
+#' calls `condathis::run_bin()`, which falls back to `Sys.which(cmd)`
+#' when `<env>/bin/<cmd>` does not exist - so on Windows the
+#' `Library/bin/<cmd>.exe` binary is found and executed directly
+#' (no shell in between, so arguments such as `%a %t` are passed
+#' verbatim, and no per-call `micromamba run` overhead).
+#'
 #' @keywords internal
 #' @noRd
 run_env_cmd <- function(
@@ -149,18 +164,13 @@ run_env_cmd <- function(
   ...,
   env_name,
   verbose = "silent",
-  error = "continue",
-  via_micromamba = use_micromamba_run()
+  error = "continue"
 ) {
-  if (isTRUE(via_micromamba)) {
-    return(condathis::run(
-      cmd,
-      ...,
-      env_name = env_name,
-      verbose = verbose,
-      error = error
-    ))
-  }
+  env_dir <- condathis::get_env_dir(env_name = env_name)
+  withr::local_path(
+    new = as.list(env_bin_search_dirs(env_dir)),
+    action = "prefix"
+  )
   condathis::run_bin(
     cmd,
     ...,

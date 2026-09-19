@@ -111,7 +111,9 @@ make_blast_worker <- function(
   verbose,
   env_name,
   outfmt = blast_outfmt_string,
-  via_micromamba = use_micromamba_run()
+  env_bin_dirs = env_bin_search_dirs(
+    condathis::get_env_dir(env_name = env_name)
+  )
 ) {
   carrier::crate(
     function(idx) {
@@ -132,14 +134,11 @@ make_blast_worker <- function(
         ),
         action = "replace"
       )
-      # `micromamba run` on Windows (env binaries live under Library/bin),
-      # direct binary elsewhere (no per-chunk activation overhead).
-      run_fn <- if (isTRUE(via_micromamba)) {
-        condathis::run
-      } else {
-        condathis::run_bin
-      }
-      blast_res <- run_fn(
+      # Make the environment's executables resolvable on every platform
+      # (Windows keeps them under Library/bin, which CRAN condathis'
+      # run_bin() does not search on its own).
+      withr::local_path(new = base::as.list(env_bin_dirs), action = "prefix")
+      blast_res <- condathis::run_bin(
         blast_type,
         "-db",
         db_path,
@@ -181,7 +180,7 @@ make_blast_worker <- function(
     outfmt = outfmt,
     verbose = verbose,
     env_name = env_name,
-    via_micromamba = via_micromamba
+    env_bin_dirs = as.character(env_bin_dirs)
   )
 }
 
