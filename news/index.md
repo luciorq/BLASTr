@@ -115,14 +115,12 @@ Development Changelog:
   …) available on Windows, which is now part of the CI matrix. With
   taxonomy over HTTPS and primer search in R, BLAST+ is the only
   external tool, so the whole package now works on Linux, macOS and
-  Windows. On Windows the tools are launched through `micromamba run`
-  (conda places executables under `Library/bin`, which the CRAN
+  Windows. Tool binaries are resolved on every platform, including
+  Windows where conda places them under `Library/bin` (the CRAN
   [`condathis::run_bin()`](https://luciorq.github.io/condathis/reference/run_bin.html)
-  does not resolve); elsewhere the direct-binary launcher is kept.
-  `options(blastr.use_micromamba_run = TRUE)` forces the Windows
-  launcher on any platform. Existing environments are not upgraded
-  implicitly; run `install_dependencies(force = TRUE)` to move to
-  2.17.0.
+  only searches `<env>/bin`), and are executed directly without a shell.
+  Existing environments are not upgraded implicitly; run
+  `install_dependencies(force = TRUE)` to move to 2.17.0.
 
 - Environment installation is hardened and now supports fallback package
   sources: when the primary specification cannot be installed, the
