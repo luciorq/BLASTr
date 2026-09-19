@@ -15,4 +15,6 @@ docs
 *.RData
 *.Rhistory
 *.gz
+# Packaged example data must be committed despite the rule above
+!inst/extdata/*.gz
 .Rapp.history
